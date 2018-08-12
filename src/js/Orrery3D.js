@@ -1,8 +1,9 @@
 import THREE from "./three";
+import { toJED } from "./utils";
 import Sun from "./Sun";
 import Planet from "./Planet";
+import Asteroid from "./Asteroid";
 import planetData from "./planets";
-import { toJED } from "./utils";
 
 export default class Orrery3D {
   constructor(options = {}) {
@@ -10,11 +11,12 @@ export default class Orrery3D {
     this.jedDelta = options.jedDelta || 1.5;
     this.jed = toJED(this.startDate);
 
+    this.planets = [];
+    this.asteroids = [];
+    this.asteroidsGeometry = {};
+
     // Create system
     this.createSystem();
-
-    // Add planets
-    this.planets = [];
     this.addPlanets(planetData);
 
     // Start rendering
@@ -22,8 +24,10 @@ export default class Orrery3D {
   }
 
   createSystem() {
-    // Create scene and renderer
+    // Create scene
     this.scene = new THREE.Scene();
+
+    // Create renderer
     this.renderer = new THREE.WebGLRenderer({
       antialias: true
     });
@@ -74,12 +78,33 @@ export default class Orrery3D {
     });
   }
 
+  addAsteroids(data) {
+    this.asteroidsGeometry = new THREE.Geometry();
+    const material = new THREE.PointsMaterial({ color: 0xaaaaaa, size: 1 });
+
+    data.forEach(d => {
+      const asteroid = new Asteroid(d);
+      this.asteroids.push(asteroid);
+      this.asteroidsGeometry.vertices.push(asteroid.body);
+    });
+
+    // Create particle system
+    const particleSystem = new THREE.Points(this.asteroidsGeometry, material);
+    this.scene.add(particleSystem);
+  }
+
+  renderAsteroids() {
+    this.asteroidsGeometry.verticesNeedUpdate = true;
+    this.asteroids.forEach(asteroid => asteroid.render(this.jed));
+  }
+
   render = () => {
     requestAnimationFrame(this.render);
 
     this.jed += this.jedDelta;
 
     this.planets.forEach(planet => planet.render(this.jed));
+    this.renderAsteroids();
 
     this.renderer.render(this.scene, this.camera);
   };

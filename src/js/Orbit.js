@@ -63,7 +63,7 @@ export default class Orbit {
     // });
 
     const material = new THREE.LineDashedMaterial({
-      color: 0x555555,
+      color: 0x333333,
       linewidth: 1,
       dashSize: 5,
       gapSize: 3
@@ -82,8 +82,7 @@ export default class Orbit {
     const period = this.getPeriodInDays();
     const delta = period / parts;
 
-    // while (i--) {
-    for (let i = 0; i <= parts; i++) {
+    while (parts--) {
       jed += delta;
 
       const pos = this.getPosAtTime(jed);

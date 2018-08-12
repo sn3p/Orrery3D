@@ -11,10 +11,10 @@ export default class Planet {
   constructor(ephemeris, options = {}) {
     this.options = Object.assign({}, Planet.defaultOptions, options);
 
-    // Planet orbit
+    // Orbit
     this.orbit = new Orbit(ephemeris);
 
-    // Create body
+    // Body
     this.body = new THREE.Mesh(
       new THREE.SphereGeometry(
         this.options.size,
@@ -29,7 +29,6 @@ export default class Planet {
 
   render(jed) {
     const pos = this.orbit.getPosAtTime(jed);
-
     this.body.position.set(...pos);
   }
 }
