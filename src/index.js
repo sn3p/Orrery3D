@@ -1,4 +1,3 @@
-import * as THREE from "three";
 import Orrery3D from "./js/Orrery3D";
 import "./main.css";
 
