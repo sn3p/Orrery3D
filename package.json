@@ -12,6 +12,9 @@
     "watch": "webpack --config webpack.config.js --mode development --watch",
     "start": "webpack-dev-server --mode development --open"
   },
+  "dependencies": {
+    "three": "^0.95.0"
+  },
   "devDependencies": {
     "babel-core": "^6.26.3",
     "babel-loader": "^7.1.5",
