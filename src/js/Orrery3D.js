@@ -1,9 +1,10 @@
 import THREE from "./three";
 import { toJED } from "./utils";
+import planetData from "./planets";
+import Gui from "./Gui";
 import Sun from "./Sun";
 import Planet from "./Planet";
 import Asteroid from "./Asteroid";
-import planetData from "./planets";
 
 export default class Orrery3D {
   constructor(options = {}) {
@@ -13,7 +14,11 @@ export default class Orrery3D {
 
     this.planets = [];
     this.asteroids = [];
+    this.asteroidData = [];
     this.asteroidsGeometry = {};
+
+    // Setup GUI
+    this.gui = new Gui(this);
 
     // Create system
     this.createSystem();
@@ -78,19 +83,36 @@ export default class Orrery3D {
     });
   }
 
-  addAsteroids(data) {
-    this.asteroidsGeometry = new THREE.Geometry();
-    const material = new THREE.PointsMaterial({ color: 0xaaaaaa, size: 1 });
+  setAsteroids(asteroidData) {
+    this.asteroidData = asteroidData;
 
-    data.forEach(d => {
-      const asteroid = new Asteroid(d);
-      this.asteroids.push(asteroid);
-      this.asteroidsGeometry.vertices.push(asteroid.body);
-    });
+    // Add all asteroids at once (for debugging/performance testing)
+    // asteroidData.forEach(data => this.addAsteroid(data));
 
     // Create particle system
+    this.asteroidsGeometry = new THREE.Geometry();
+    const material = new THREE.PointsMaterial({ color: 0xaaaaaa, size: 1 });
     const particleSystem = new THREE.Points(this.asteroidsGeometry, material);
     this.scene.add(particleSystem);
+  }
+
+  discoverAsteroids() {
+    for (let i = this.asteroids.length; i < this.asteroidData.length; ++i) {
+      const data = this.asteroidData[i];
+
+      if (data.disc > this.jed) {
+        break;
+      }
+
+      // Add asteroid
+      this.addAsteroid(data);
+    }
+  }
+
+  addAsteroid(data) {
+    const asteroid = new Asteroid(data);
+    this.asteroids.push(asteroid);
+    this.asteroidsGeometry.vertices.push(asteroid.body);
   }
 
   renderAsteroids() {
@@ -101,11 +123,17 @@ export default class Orrery3D {
   render = () => {
     requestAnimationFrame(this.render);
 
+    this.gui.stats.begin();
+
     this.jed += this.jedDelta;
 
     this.planets.forEach(planet => planet.render(this.jed));
+    this.discoverAsteroids();
     this.renderAsteroids();
 
     this.renderer.render(this.scene, this.camera);
+
+    this.gui.update();
+    this.gui.stats.end();
   };
 }

@@ -20,3 +20,8 @@ export function ajaxGet(url, callback) {
 export function toJED(d) {
   return d / 86400000 + UNIX_EPOCH_JULIAN_DATE;
 }
+
+// Julian to Gregorian date
+export function fromJED(jed) {
+  return new Date(86400000 * (-UNIX_EPOCH_JULIAN_DATE + jed));
+}
