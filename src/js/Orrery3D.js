@@ -27,6 +27,7 @@ export default class Orrery3D {
     this.renderer = new THREE.WebGLRenderer({
       antialias: true
     });
+    this.renderer.setPixelRatio(window.devicePixelRatio);
     this.renderer.setSize(window.innerWidth, window.innerHeight);
     this.renderer.setClearColor(0x000000, 1);
 
@@ -46,11 +47,6 @@ export default class Orrery3D {
     // Add controls
     this.controls = new THREE.OrbitControls(this.camera);
 
-    // Add grid
-    const grid = new THREE.GridHelper(3000, 10, 0x666666, 0x666666);
-    grid.rotation.x = Math.PI / 2;
-    this.scene.add(grid);
-
     // Add Sun
     const sun = new Sun();
     this.scene.add(sun.body);
@@ -67,6 +63,10 @@ export default class Orrery3D {
         size: data.size,
         color: data.color
       });
+
+      // Draw orbit
+      const orbit = planet.orbit.createOrbit(this.jed);
+      this.scene.add(orbit);
 
       // Add planet
       this.planets.push(planet);

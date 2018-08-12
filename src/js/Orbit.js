@@ -1,4 +1,5 @@
 import { PIXELS_PER_AU, J2000, YEAR, DEG_TO_RAD } from "./constants";
+import * as THREE from "three";
 
 export default class Orbit {
   constructor(ephemeris) {
@@ -50,6 +51,48 @@ export default class Orbit {
     const z = r * (sin(v + p - o) * sin(i));
 
     return [x, y, z];
+  }
+
+  createOrbit(jed = J2000) {
+    const points = new THREE.Geometry();
+    points.vertices = this.getOrbitPoints(jed);
+
+    // const material = new THREE.LineBasicMaterial({
+    //   color: 0x555555,
+    //   linewidth: 1
+    // });
+
+    const material = new THREE.LineDashedMaterial({
+      color: 0x555555,
+      linewidth: 1,
+      dashSize: 5,
+      gapSize: 3
+    });
+
+    const line = new THREE.Line(points, material);
+
+    // Required for dotted lines
+    line.computeLineDistances();
+
+    return line;
+  }
+
+  getOrbitPoints(jed, parts = 360) {
+    const points = [];
+    const period = this.getPeriodInDays();
+    const delta = period / parts;
+
+    // while (i--) {
+    for (let i = 0; i <= parts; i++) {
+      jed += delta;
+
+      const pos = this.getPosAtTime(jed);
+      const vector = new THREE.Vector3(...pos);
+
+      points.push(vector);
+    }
+
+    return points;
   }
 
   getPeriodInDays() {
