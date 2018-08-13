@@ -2,15 +2,10 @@ import { PIXELS_PER_AU, J2000, YEAR, DEG_TO_RAD } from "./constants";
 import * as THREE from "three";
 
 export default class Orbit {
-  constructor(ephemeris) {
-    this.ephemeris = ephemeris;
-  }
-
   // Get position at time for Julian Date
-  getPosAtTime(jed) {
+  static getPosAtTime(eph, jed) {
     const { cos, sin } = Math;
 
-    const eph = this.ephemeris;
     const epoch = eph.epoch;
     const e = eph.e;
     const a = eph.a;
@@ -53,9 +48,9 @@ export default class Orbit {
     return [x, y, z];
   }
 
-  createOrbit(jed = J2000) {
+  static createOrbit(eph, jed = J2000) {
     const points = new THREE.Geometry();
-    points.vertices = this.getOrbitPoints(jed);
+    points.vertices = Orbit.getOrbitPoints(eph, jed);
 
     // const material = new THREE.LineBasicMaterial({
     //   color: 0x555555,
@@ -77,15 +72,15 @@ export default class Orbit {
     return line;
   }
 
-  getOrbitPoints(jed, parts = 360) {
+  static getOrbitPoints(eph, jed, parts = 360) {
     const points = [];
-    const period = this.getPeriodInDays();
+    const period = Orbit.getPeriodInDays(eph);
     const delta = period / parts;
 
     while (parts--) {
       jed += delta;
 
-      const pos = this.getPosAtTime(jed);
+      const pos = Orbit.getPosAtTime(eph, jed);
       const vector = new THREE.Vector3(...pos);
 
       points.push(vector);
@@ -94,7 +89,7 @@ export default class Orbit {
     return points;
   }
 
-  getPeriodInDays() {
-    return Math.sqrt(Math.pow(this.ephemeris.a, 3)) * YEAR;
+  static getPeriodInDays(eph) {
+    return Math.sqrt(Math.pow(eph.a, 3)) * YEAR;
   }
 }

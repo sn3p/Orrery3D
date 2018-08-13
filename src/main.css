@@ -2,9 +2,11 @@ body {
   background: black;
   font-family: Lucida Console, Courier, monospace;
   margin: 0;
+  overflow: hidden;
 }
 
-.orrery {
+.orrery canvas {
+  display: block;
 }
 
 .orrery-date,
@@ -13,7 +15,6 @@ body {
   color: #666;
   padding: 5px;
   position: fixed;
-  z-index: 1;
 }
 
 .orrery-fps {

@@ -4,7 +4,7 @@ import planetData from "./planets";
 import Gui from "./Gui";
 import Sun from "./Sun";
 import Planet from "./Planet";
-import Asteroid from "./Asteroid";
+import Orbit from "./Orbit";
 
 export default class Orrery3D {
   constructor(options = {}) {
@@ -13,9 +13,8 @@ export default class Orrery3D {
     this.jed = toJED(this.startDate);
 
     this.planets = [];
-    this.asteroids = [];
     this.asteroidData = [];
-    this.asteroidsGeometry = {};
+    this.asteroidsDiscovered = 0;
 
     // Setup GUI
     this.gui = new Gui(this);
@@ -74,7 +73,7 @@ export default class Orrery3D {
       });
 
       // Draw orbit
-      const orbit = planet.orbit.createOrbit(this.jed);
+      const orbit = Orbit.createOrbit(data.ephemeris, this.jed);
       this.scene.add(orbit);
 
       // Add planet
@@ -86,38 +85,43 @@ export default class Orrery3D {
   setAsteroids(asteroidData) {
     this.asteroidData = asteroidData;
 
-    // Add all asteroids at once (for debugging/performance testing)
-    // asteroidData.forEach(data => this.addAsteroid(data));
+    // Particle system for asteroids
+    const geometry = new THREE.BufferGeometry();
+    const material = new THREE.PointsMaterial({
+      color: 0xaaaaaa,
+      size: 1
+    });
 
-    // Create particle system
-    this.asteroidsGeometry = new THREE.Geometry();
-    const material = new THREE.PointsMaterial({ color: 0xaaaaaa, size: 1 });
-    const particleSystem = new THREE.Points(this.asteroidsGeometry, material);
+    const positions = new Float32Array(asteroidData.length * 3);
+    geometry.addAttribute("position", new THREE.BufferAttribute(positions, 3));
+    this.asteroidsGeometry = geometry;
+
+    const particleSystem = new THREE.Points(geometry, material);
     this.scene.add(particleSystem);
   }
 
-  discoverAsteroids() {
-    for (let i = this.asteroids.length; i < this.asteroidData.length; ++i) {
+  renderAsteroids() {
+    const positions = this.asteroidsGeometry.attributes.position.array;
+    let index = 0;
+    let i;
+
+    for (i = 0; i < this.asteroidData.length; ++i) {
       const data = this.asteroidData[i];
 
       if (data.disc > this.jed) {
         break;
       }
 
-      // Add asteroid
-      this.addAsteroid(data);
+      const [x, y, z] = Orbit.getPosAtTime(data, this.jed);
+
+      positions[index++] = x;
+      positions[index++] = y;
+      positions[index++] = z;
     }
-  }
 
-  addAsteroid(data) {
-    const asteroid = new Asteroid(data);
-    this.asteroids.push(asteroid);
-    this.asteroidsGeometry.vertices.push(asteroid.body);
-  }
-
-  renderAsteroids() {
-    this.asteroidsGeometry.verticesNeedUpdate = true;
-    this.asteroids.forEach(asteroid => asteroid.render(this.jed));
+    this.asteroidsDiscovered = i + 1;
+    this.asteroidsGeometry.setDrawRange(0, this.asteroidsDiscovered);
+    this.asteroidsGeometry.attributes.position.needsUpdate = true;
   }
 
   render = () => {
@@ -128,8 +132,10 @@ export default class Orrery3D {
     this.jed += this.jedDelta;
 
     this.planets.forEach(planet => planet.render(this.jed));
-    this.discoverAsteroids();
-    this.renderAsteroids();
+
+    if (this.asteroidsGeometry) {
+      this.renderAsteroids();
+    }
 
     this.renderer.render(this.scene, this.camera);
 
