@@ -17,3 +17,6 @@ ajaxGet(MPC_DATA_URL, data => {
 
   orrery.setAsteroids(asteroidData);
 });
+
+// Window resize
+window.addEventListener("resize", orrery.resize, false);

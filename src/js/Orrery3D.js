@@ -142,4 +142,11 @@ export default class Orrery3D {
     this.gui.update();
     this.gui.stats.end();
   };
+
+  resize = () => {
+    this.camera.aspect = window.innerWidth / window.innerHeight;
+    this.camera.updateProjectionMatrix();
+
+    this.renderer.setSize(window.innerWidth, window.innerHeight);
+  };
 }
