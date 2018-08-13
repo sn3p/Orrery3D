@@ -19,6 +19,6 @@ export default class Gui {
 
     this.dateElement.textContent = date;
     this.fpsElement.textContent = `${this.stats.fps} FPS`;
-    this.countElement.textContent = this.orrery.asteroids.length;
+    this.countElement.textContent = this.orrery.asteroidsDiscovered;
   }
 }
