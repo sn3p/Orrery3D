@@ -37,7 +37,6 @@ export default class Orrery3D {
     });
     this.renderer.setPixelRatio(window.devicePixelRatio);
     this.renderer.setSize(window.innerWidth, window.innerHeight);
-    this.renderer.setClearColor(0x000000, 1);
 
     // Create camera
     this.camera = new THREE.PerspectiveCamera(
@@ -83,17 +82,62 @@ export default class Orrery3D {
   }
 
   setAsteroids(asteroidData) {
+    asteroidData.length = 9000;
     this.asteroidData = asteroidData;
 
     // Particle system for asteroids
     const geometry = new THREE.BufferGeometry();
-    const material = new THREE.PointsMaterial({
-      color: 0xaaaaaa,
-      size: 1
-    });
+
+    // const material = new THREE.ShaderMaterial({
+    //   uniforms: {
+    //     // texture: {
+    //     //   value: new THREE.TextureLoader().load("textures/sprites/spark1.png")
+    //     // }
+    //     // diffuse: {
+    //     //   value: new THREE.Color("aqua")
+    //     // },
+    //     color1: {
+    //       value: new THREE.Color(0x00ff00)
+    //     },
+    //     color2: {
+    //       value: new THREE.Color("white")
+    //     },
+    //     // color: { type: "c", value: new THREE.Color( 0x00ff00 ) },
+    //     size: { type: "f", value: 2.0 },
+    //     time: { type: "f", value: 1.0 }
+    //   },
+    //   vertexShader: document.getElementById("vertexshader").textContent,
+    //   fragmentShader: document.getElementById("fragmentshader").textContent,
+    //   blending: THREE.AdditiveBlending,
+    //   depthTest: false,
+    //   transparent: true,
+    //   vertexColors: true
+    // });
 
     const positions = new Float32Array(asteroidData.length * 3);
+    const colors = new Float32Array(asteroidData.length * 3);
+    // console.log(positions);
+
+    const green = new THREE.Color(0x00ff00);
+    // const white = new THREE.Color("white");
+    let index = 0;
+    for (let i = 0; i < this.asteroidData.length; ++i) {
+      colors[index++] = green;
+      colors[index++] = green;
+      colors[index++] = green;
+      // geometry.colors[i] = new THREE.Color();
+      // geometry.colors[i].setHSL(Math.random(), 1.0, 0.5);
+    }
     geometry.addAttribute("position", new THREE.BufferAttribute(positions, 3));
+    geometry.addAttribute("color", new THREE.BufferAttribute(colors, 3));
+
+    const material = new THREE.PointsMaterial({
+      // color: 0xaaaaaa,
+      size: 2,
+      // transparent: true,
+      vertexColors: THREE.VertexColors
+    });
+
     this.asteroidsGeometry = geometry;
 
     const particleSystem = new THREE.Points(geometry, material);
@@ -102,8 +146,12 @@ export default class Orrery3D {
 
   renderAsteroids() {
     const positions = this.asteroidsGeometry.attributes.position.array;
+    const colors = this.asteroidsGeometry.attributes.color.array;
     let index = 0;
     let i;
+
+    // const green = new THREE.Color(0x00ff00);
+    // const white = new THREE.Color("white");
 
     for (i = 0; i < this.asteroidData.length; ++i) {
       const data = this.asteroidData[i];
@@ -117,11 +165,31 @@ export default class Orrery3D {
       positions[index++] = x;
       positions[index++] = y;
       positions[index++] = z;
+
+      // index = index - 3;
+      // colors[index++] = green;
+      // colors[index++] = green;
+      // colors[index++] = green;
+
+      // if (data.disc > this.jed - 100) {
+      //   console.log("green");
+      //   colors[index++] = green;
+      //   colors[index++] = green;
+      //   colors[index++] = green;
+      //   // colors[index++] = colors[index++] = colors[index++] = green;
+      // } else {
+      //   // console.log("white");
+      //   colors[index++] = white;
+      //   colors[index++] = white;
+      //   colors[index++] = white;
+      //   //   colors[index++] = colors[index++] = colors[index++] = white;
+      // }
     }
 
     this.asteroidsDiscovered = i + 1;
     this.asteroidsGeometry.setDrawRange(0, this.asteroidsDiscovered);
     this.asteroidsGeometry.attributes.position.needsUpdate = true;
+    this.asteroidsGeometry.attributes.color.needsUpdate = true;
   }
 
   render = () => {
