@@ -2,7 +2,7 @@
 
 [Visualization](https://sn3p.github.io/Orrery3D) showing the orbits of [minor planets](https://en.wikipedia.org/wiki/Minor_planet) and their discovery over time.
 
-This is a 3D port from [Orrery](https://sn3p.github.io/Orrery) (2D).
+This is a 3D port of [Orrery](https://github.com/sn3p/Orrery) (2D).
 
 ## How to start
 
