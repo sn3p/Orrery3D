@@ -14,5 +14,60 @@
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/95/three.min.js"></script>
     <script src="<%= htmlWebpackPlugin.files.chunks.main.entry %>"></script>
+
+    <script type="x-shader/x-vertex" id="vertexshader">
+      uniform float size;
+      // attribute float size;
+
+      // varying vec3 vColor1;
+      // varying vec3 vColor2;
+      // varying vec3 vPosition;
+
+      void main() {
+        // vColor1 = color1;
+        // vColor2 = color2;
+
+        vec4 vPosition = modelViewMatrix * vec4(position, 1.0);
+        gl_PointSize = size * (500.0 / length(vPosition.xyz));
+        // gl_PointSize = size;
+        gl_Position = projectionMatrix * vPosition;
+
+        // gl_Position = vec4(position, 1.0);
+      }
+    </script>
+
+    <script type="x-shader/x-fragment" id="fragmentshader">
+      // #ifdef GL_ES
+      // precision mediump float;
+      // #endif
+
+      uniform float time;
+      // uniform vec3 diffuse;
+
+      // uniform vec3 color1;
+      // uniform vec3 color2;
+
+      // varying vec3 vColor1;
+      // varying vec3 vColor2;
+
+      vec3 colorA = vec3(0.149, 0.141, 0.912);
+      vec3 colorB = vec3(1.000, 0.833, 0.224);
+
+      void main() {
+        // gl_FragColor = vec4(vColor, 1.0);
+        // gl_FragColor = vec4(1.0, 0.0, 0.0, 1.0);
+        // gl_FragColor = vec4(diffuse, 1.0);
+
+        vec3 color = vec3(0.0);
+
+        float pct = abs(sin(time));
+
+        color = mix(colorA, colorB, pct);
+        // color = mix(vColor1, vColor2, pct);
+        // color = mix(color1, color2, pct);
+
+        gl_FragColor = vec4(color, 1.0);
+      }
+    </script>
   </body>
 </html>
