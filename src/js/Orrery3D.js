@@ -5,6 +5,7 @@ import Gui from "./Gui";
 import Sun from "./Sun";
 import Planet from "./Planet";
 import Orbit from "./Orbit";
+import Leap from "leapjs";
 
 export default class Orrery3D {
   constructor(options = {}) {
@@ -22,9 +23,38 @@ export default class Orrery3D {
     // Create system
     this.createSystem();
     this.addPlanets(planetData);
+    this.leapControls(this.camera, this.scene);
 
     // Start rendering
     this.render();
+  }
+
+  leapControls(camera, scene) {
+    const controller = new Leap.Controller();
+    controller.connect();
+
+    // const controls = new THREE.LeapPaddleControls(camera, controller, scene);
+    // const controls = new THREE.LeapSpringControls(camera, controller, scene);
+    // const controls = new THREE.LeapTrackballControls(camera, controller, scene);
+
+    // console.log(THREE.LeapTrackballControls);
+    // const controls = THREE.LeapTrackballControls(camera, controller);
+    // console.log(controls);
+    // controls.rotationSpeed = 10;
+    // controls.rotationDampening = 0.98;
+    // controls.zoom = 40;
+    // controls.zoomDampening = 0.6;
+    // controls.zoomCutoff = 0.9;
+    // controls.minZoom = 20;
+    // controls.maxZoom = 80;
+
+    const controls = new THREE.LeapPointerControls(camera, controller, scene);
+    controls.size = 100;
+    controls.speed = 0.01;
+    controls.dampening = 0.99;
+    controls.target = new THREE.Vector3(0, 0, 0);
+
+    this.leapControls = controls;
   }
 
   createSystem() {
@@ -137,6 +167,7 @@ export default class Orrery3D {
       this.renderAsteroids();
     }
 
+    this.leapControls.update();
     this.renderer.render(this.scene, this.camera);
 
     this.gui.update();
