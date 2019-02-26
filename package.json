@@ -13,6 +13,7 @@
     "start": "webpack-dev-server --mode development --open"
   },
   "dependencies": {
+    "leapjs": "^0.6.4",
     "three": "^0.95.0"
   },
   "devDependencies": {
