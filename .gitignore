@@ -3,3 +3,8 @@ node_modules/
 
 # OS files
 .DS_Store
+
+# Logs created by npm or yarn
+npm-debug.log
+yarn-debug.log
+yarn-error.log
