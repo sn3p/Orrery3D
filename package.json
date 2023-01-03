@@ -10,14 +10,14 @@
     "build": "webpack --config webpack.config.js --mode production",
     "deploy": "git subtree push --prefix dist origin gh-pages",
     "watch": "webpack --config webpack.config.js --mode development --watch",
-    "start": "webpack-dev-server --mode development --open"
+    "start": "webpack-dev-server --mode development --host 0.0.0.0 --https"
   },
   "dependencies": {
+    "ar.js": "^1.6.2",
     "three": "^0.101.1"
   },
   "devDependencies": {
     "@babel/core": "^7.3.4",
-    "@babel/plugin-proposal-class-properties": "^7.3.4",
     "@babel/preset-env": "^7.3.4",
     "babel-loader": "^8.0.5",
     "css-loader": "^2.1.0",

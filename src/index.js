@@ -15,8 +15,5 @@ ajaxGet(MPC_DATA_URL, data => {
   // Sort by discovery date
   asteroidData.sort((a, b) => a.disc - b.disc);
 
-  orrery.setAsteroids(asteroidData);
+  // orrery.setAsteroids(asteroidData);
 });
-
-// Window resize
-window.addEventListener("resize", orrery.resize, false);
