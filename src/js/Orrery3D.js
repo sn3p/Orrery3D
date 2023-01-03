@@ -1,4 +1,5 @@
-import THREE from "./three";
+import * as THREE from "three";
+import { OrbitControls } from "three/examples/jsm/controls/OrbitControls";
 import { toJED } from "./utils";
 import planetData from "./planets";
 import Gui from "./Gui";
@@ -39,6 +40,10 @@ export default class Orrery3D {
     this.renderer.setSize(window.innerWidth, window.innerHeight);
     this.renderer.setClearColor(0x000000, 1);
 
+    // Add renderer
+    this.containerElement = document.getElementById("orrery");
+    this.containerElement.appendChild(this.renderer.domElement);
+
     // Create camera
     this.camera = new THREE.PerspectiveCamera(
       60,
@@ -53,15 +58,11 @@ export default class Orrery3D {
     this.camera.lookAt(this.scene.position);
 
     // Add controls
-    this.controls = new THREE.OrbitControls(this.camera);
+    this.controls = new OrbitControls(this.camera, this.renderer.domElement);
 
     // Add Sun
     const sun = new Sun();
     this.scene.add(sun.body);
-
-    // Add renderer
-    this.containerElement = document.getElementById("orrery");
-    this.containerElement.appendChild(this.renderer.domElement);
   }
 
   addPlanets(planetData) {
@@ -93,7 +94,7 @@ export default class Orrery3D {
     });
 
     const positions = new Float32Array(asteroidData.length * 3);
-    geometry.addAttribute("position", new THREE.BufferAttribute(positions, 3));
+    geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
     this.asteroidsGeometry = geometry;
 
     const particleSystem = new THREE.Points(geometry, material);

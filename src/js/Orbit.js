@@ -49,8 +49,7 @@ export default class Orbit {
   }
 
   static createOrbit(eph, jed = J2000) {
-    const points = new THREE.Geometry();
-    points.vertices = Orbit.getOrbitPoints(eph, jed);
+    const geometry = Orbit.getOrbitGeometry(eph, jed);
 
     // const material = new THREE.LineBasicMaterial({
     //   color: 0x555555,
@@ -64,7 +63,7 @@ export default class Orbit {
       gapSize: 3
     });
 
-    const line = new THREE.Line(points, material);
+    const line = new THREE.Line(geometry, material);
 
     // Required for dotted lines
     line.computeLineDistances();
@@ -72,7 +71,7 @@ export default class Orbit {
     return line;
   }
 
-  static getOrbitPoints(eph, jed, parts = 360) {
+  static getOrbitGeometry(eph, jed, parts = 360) {
     const points = [];
     const period = Orbit.getPeriodInDays(eph);
     const delta = period / parts;
@@ -86,7 +85,7 @@ export default class Orbit {
       points.push(vector);
     }
 
-    return points;
+    return new THREE.BufferGeometry().setFromPoints(points);
   }
 
   static getPeriodInDays(eph) {
