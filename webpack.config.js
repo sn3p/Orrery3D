@@ -12,6 +12,7 @@ module.exports = {
   },
   externals: {
     three: "THREE"
+    // "ar.js": "THREEx"
   },
   module: {
     rules: [

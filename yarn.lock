@@ -866,6 +866,11 @@ aproba@^1.0.3, aproba@^1.1.1:
   resolved "https://registry.yarnpkg.com/aproba/-/aproba-1.2.0.tgz#6802e6264efd18c790a1b0d517f0f2627bf2c94a"
   integrity sha512-Y9J6ZjXtoYh8RnXVCMOU/ttDmk1aBjunq9vO0ta5x85WDQiQfUF9sIPBITdbiiIVcBo03Hi3jMxigBtsddlXRw==
 
+ar.js@^1.6.2:
+  version "1.6.2"
+  resolved "https://registry.yarnpkg.com/ar.js/-/ar.js-1.6.2.tgz#317ab7ec74330a49c54a1ebd32b829382797eaba"
+  integrity sha512-DyY2p+burggQXTbhBdYVZCCxtmUufJuj4JhbNT3gYbPMvJR1NafpvNihf5Bdel3QBkwy+uRgDfoOm3Gj7OyhPg==
+
 are-we-there-yet@~1.1.2:
   version "1.1.5"
   resolved "https://registry.yarnpkg.com/are-we-there-yet/-/are-we-there-yet-1.1.5.tgz#4b35c2944f062a8bfcda66410760350fe9ddfc21"
