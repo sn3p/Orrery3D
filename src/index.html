@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <title>Orrery3D</title>
     <meta name="description" content="3D minor planet orbits and discovery visualization">
-    <link rel="stylesheet" href="<%= htmlWebpackPlugin.files.chunks.main.css %>">
+    <link rel="stylesheet" href="<%= htmlWebpackPlugin.files.css[0] %>">
   </head>
   <body>
     <div class="orrery" id="orrery"></div>
@@ -12,6 +12,6 @@
     <div class="orrery-date" id="orrery-date"></div>
     <div class="orrery-count" id="orrery-count"></div>
 
-    <script src="<%= htmlWebpackPlugin.files.chunks.main.entry %>"></script>
+    <script src="<%= htmlWebpackPlugin.files.js[0] %>"></script>
   </body>
 </html>
