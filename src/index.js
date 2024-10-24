@@ -5,7 +5,9 @@ import "./main.css";
 const MPC_DATA_URL = catalog;
 
 // Init Orrery
-const orrery = new Orrery3D();
+const orrery = new Orrery3D({
+  container: document.getElementById("orrery"),
+});
 
 fetch(MPC_DATA_URL)
   .then((response) => response.json())

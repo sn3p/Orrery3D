@@ -56,6 +56,7 @@ module.exports = {
     minimize: true,
     minimizer: [
       new TerserPlugin({
+        exclude: /hot-update\.js$/,
         extractComments: false,
       }),
     ],

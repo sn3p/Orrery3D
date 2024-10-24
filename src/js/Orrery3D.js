@@ -9,6 +9,7 @@ import Orbit from "./Orbit";
 
 export default class Orrery3D {
   constructor(options = {}) {
+    this.container = options.container || document.body;
     this.startDate = options.startDate || new Date(1980, 1);
     this.jedDelta = options.jedDelta || 1.5;
     this.jed = toJED(this.startDate);
@@ -34,15 +35,14 @@ export default class Orrery3D {
 
     // Create renderer
     this.renderer = new THREE.WebGLRenderer({
-      antialias: true
+      antialias: true,
     });
     this.renderer.setPixelRatio(window.devicePixelRatio);
     this.renderer.setSize(window.innerWidth, window.innerHeight);
     this.renderer.setClearColor(0x000000, 1);
 
     // Add renderer
-    this.containerElement = document.getElementById("orrery");
-    this.containerElement.appendChild(this.renderer.domElement);
+    this.container.appendChild(this.renderer.domElement);
 
     // Create camera
     this.camera = new THREE.PerspectiveCamera(
@@ -51,9 +51,7 @@ export default class Orrery3D {
       0.001,
       2000000
     );
-    this.camera.position.x = 500;
-    this.camera.position.y = 500;
-    this.camera.position.z = 400;
+    this.camera.position.set(500, 500, 400);
     this.camera.up.set(0, 0, 1);
     this.camera.lookAt(this.scene.position);
 
@@ -66,11 +64,11 @@ export default class Orrery3D {
   }
 
   addPlanets(planetData) {
-    planetData.forEach(data => {
+    planetData.forEach((data) => {
       const planet = new Planet(data.ephemeris, {
         name: data.name,
         size: data.size,
-        color: data.color
+        color: data.color,
       });
 
       // Draw orbit
@@ -90,7 +88,7 @@ export default class Orrery3D {
     const geometry = new THREE.BufferGeometry();
     const material = new THREE.PointsMaterial({
       color: 0xaaaaaa,
-      size: 1
+      size: 1,
     });
 
     const positions = new Float32Array(asteroidData.length * 3);
@@ -132,7 +130,7 @@ export default class Orrery3D {
 
     this.jed += this.jedDelta;
 
-    this.planets.forEach(planet => planet.render(this.jed));
+    this.planets.forEach((planet) => planet.render(this.jed));
 
     if (this.asteroidsGeometry) {
       this.renderAsteroids();
