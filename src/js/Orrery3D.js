@@ -12,14 +12,11 @@ export default class Orrery3D {
     this.container = options.container || document.body;
     this.startDate = options.startDate || new Date(1980, 1);
     this.jedDelta = options.jedDelta || 1.5;
-    this.jed = toJED(this.startDate);
-
-    this.fadeDurationJED = 500;
-
-    // Colors
     this.asteroidColor = new THREE.Color(options.asteroidColor || 0xaaaaaa);
     this.asteroidDiscoveryColor = new THREE.Color(options.asteroidDiscoveryColor || 0x00ff00);
+    this.asteroidDiscoveryDuration = options.asteroidDiscoveryDuration || 500;
 
+    this.jed = toJED(this.startDate);
     this.planets = [];
     this.asteroidData = [];
     this.asteroidsDiscovered = 0;
@@ -95,17 +92,6 @@ export default class Orrery3D {
     const positions = new Float32Array(asteroidData.length * 3);
     const colors = new Float32Array(asteroidData.length * 3);
 
-    // Initialize all positions and colors to gray
-    // for (let i = 0; i < asteroidData.length; i++) {
-    //   positions[i * 3] = 0;
-    //   positions[i * 3 + 1] = 0;
-    //   positions[i * 3 + 2] = 0;
-
-    //   colors[i * 3] = 0.666;
-    //   colors[i * 3 + 1] = 0.666;
-    //   colors[i * 3 + 2] = 0.666;
-    // }
-
     geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
     geometry.setAttribute("color", new THREE.BufferAttribute(colors, 3));
     this.asteroidsGeometry = geometry;
@@ -116,7 +102,6 @@ export default class Orrery3D {
     this.tempColor = new THREE.Color(); // reusable scratch color
 
     const material = new THREE.PointsMaterial({
-      // color: 0xaaaaaa,
       size: 1,
       vertexColors: true,
     });
@@ -126,10 +111,7 @@ export default class Orrery3D {
   }
 
   renderAsteroids() {
-    const positions = this.asteroidsGeometry.attributes.position.array;
-    const colors = this.asteroidsGeometry.attributes.color.array;
-
-    let index = 0;
+    let offset = 0;
     let i;
 
     for (i = 0; i < this.asteroidData.length; ++i) {
@@ -140,29 +122,39 @@ export default class Orrery3D {
         break;
       }
 
-      // Set position
-      const [x, y, z] = Orbit.getPosAtTime(data, this.jed);
-      positions[index] = x;
-      positions[index + 1] = y;
-      positions[index + 2] = z;
+      // Calculate position and color
+      this.updateAsteroidPosition(data, offset);
+      this.updateAsteroidColor(data, offset);
 
-      // Set color
-      const ageJED = this.jed - data.disc;
-      const fadeProgress = Math.min(Math.max(ageJED / this.fadeDurationJED, 0), 1);
-      const { h, l } = this.asteroidDiscoveryHSL;
-      const s = 1 - fadeProgress;
-      this.tempColor.setHSL(h, s, l);
-      colors[index] = this.tempColor.r;
-      colors[index + 1] = this.tempColor.g;
-      colors[index + 2] = this.tempColor.b;
-
-      index += 3;
+      // Update offset
+      offset += 3;
     }
 
-    this.asteroidsDiscovered = i + 1;
-    this.asteroidsGeometry.setDrawRange(0, this.asteroidsDiscovered);
+    // Update geometry
     this.asteroidsGeometry.attributes.position.needsUpdate = true;
     this.asteroidsGeometry.attributes.color.needsUpdate = true;
+
+    // Set the number of asteroids to draw
+    this.asteroidsDiscovered = i + 1;
+    this.asteroidsGeometry.setDrawRange(0, this.asteroidsDiscovered);
+  }
+
+  updateAsteroidPosition(data, offset) {
+    const [x, y, z] = Orbit.getPosAtTime(data, this.jed);
+
+    const positions = this.asteroidsGeometry.attributes.position.array;
+    positions[offset] = x;
+    positions[offset + 1] = y;
+    positions[offset + 2] = z;
+  }
+
+  updateAsteroidColor(data, offset) {
+    const t = THREE.MathUtils.clamp((this.jed - data.disc) / this.asteroidDiscoveryDuration, 0, 1);
+    const c = this.asteroidsGeometry.attributes.color.array;
+
+    c[offset] = THREE.MathUtils.lerp(this.asteroidDiscoveryColor.r, this.asteroidColor.r, t);
+    c[offset + 1] = THREE.MathUtils.lerp(this.asteroidDiscoveryColor.g, this.asteroidColor.g, t);
+    c[offset + 2] = THREE.MathUtils.lerp(this.asteroidDiscoveryColor.b, this.asteroidColor.b, t);
   }
 
   render = () => {
