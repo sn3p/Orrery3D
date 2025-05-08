@@ -14,10 +14,10 @@ export default class Orrery3D {
     this.jedDelta = options.jedDelta || 1.5;
     this.asteroidColor = new THREE.Color(options.asteroidColor || 0xaaaaaa);
     this.asteroidDiscoveryColor = new THREE.Color(options.asteroidDiscoveryColor || 0x00ff00);
-    this.asteroidDiscoveryDuration = options.asteroidDiscoveryDuration || 500;
+    this.asteroidDiscoveryDuration = options.asteroidDiscoveryDuration || 500; // in Julian days
 
-    this.jed = toJED(this.startDate);
     this.planets = [];
+    this.jed = toJED(this.startDate);
     this.asteroidData = [];
     this.asteroidsDiscovered = 0;
 
@@ -120,26 +120,33 @@ export default class Orrery3D {
   }
 
   updateAsteroids() {
-    let i;
+    // Precompute the fade cutoff JED at which the asteroid will be fully faded
+    const fadeCutoff = this.jed - this.asteroidDiscoveryDuration;
 
+    let i;
     for (i = 0; i < this.asteroidData.length; ++i) {
       const data = this.asteroidData[i];
 
       // Break if asteroid is not yet discovered
       if (data.disc > this.jed) break;
 
+      const offset = i * 3;
+
       // Calculate position and color
-      this.updateAsteroidPosition(data, i * 3);
-      // TODO: Only update color if not fully faded?
-      this.updateAsteroidColor(data, i * 3);
+      this.updateAsteroidPosition(data, offset);
+
+      // Only update color if asteroid is still fading
+      if (data.disc > fadeCutoff) {
+        this.updateAsteroidColor(data, offset);
+      }
     }
 
     // Update geometry
     this.asteroidsGeometry.attributes.position.needsUpdate = true;
     this.asteroidsGeometry.attributes.color.needsUpdate = true;
 
-    // Set the number of asteroids to draw
-    this.asteroidsDiscovered = i + 1;
+    // Update the number of asteroids to draw
+    this.asteroidsDiscovered = i;
     this.asteroidsGeometry.setDrawRange(0, this.asteroidsDiscovered);
   }
 
@@ -154,9 +161,6 @@ export default class Orrery3D {
 
   updateAsteroidColor(data, offset) {
     const ageJED = this.jed - data.disc;
-
-    // Skip calculation if fully faded
-    if (ageJED >= this.asteroidDiscoveryDuration) return;
 
     const t = ageJED / this.asteroidDiscoveryDuration;
     const c = this.asteroidsGeometry.attributes.color.array;
