@@ -12,9 +12,9 @@ export default class Orrery3D {
     this.container = options.container || document.body;
     this.startDate = options.startDate || new Date(1980, 1);
     this.jedDelta = options.jedDelta || 1.5;
-    this.asteroidColor = new THREE.Color(options.asteroidColor || 0xaaaaaa);
+    this.asteroidColor = new THREE.Color(options.asteroidColor || 0x999999);
     this.asteroidDiscoveryColor = new THREE.Color(options.asteroidDiscoveryColor || 0x00ff00);
-    this.asteroidDiscoveryDuration = options.asteroidDiscoveryDuration || 500; // in Julian days
+    this.asteroidDiscoveryDuration = options.asteroidDiscoveryDuration || 200; // in Julian days
 
     this.jed = toJED(this.startDate);
     this.planets = [];
