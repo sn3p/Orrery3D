@@ -30,7 +30,7 @@ export default class Orbit {
     let lastdiff;
 
     do {
-      const E1 = M + e * sin(E0);
+      const E1 = E0 - (E0 - e * sin(E0) - M) / (1 - e * cos(E0));
       lastdiff = Math.abs(E1 - E0);
       E0 = E1;
     } while (lastdiff > 0.0000001);
@@ -60,7 +60,7 @@ export default class Orbit {
       color: 0x333333,
       linewidth: 1,
       dashSize: 5,
-      gapSize: 3
+      gapSize: 3,
     });
 
     const line = new THREE.Line(geometry, material);
@@ -71,21 +71,38 @@ export default class Orbit {
     return line;
   }
 
-  static getOrbitGeometry(eph, jed, parts = 360) {
-    const points = [];
+  static getOrbitGeometry(eph, jed = J2000, baseResolution = 90) {
+    const parts = Orbit.getOrbitResolution(eph, baseResolution);
     const period = Orbit.getPeriodInDays(eph);
     const delta = period / parts;
+    const positions = new Float32Array(parts * 3);
 
-    while (parts--) {
-      jed += delta;
+    for (let i = 0; i < parts; ++i) {
+      const j = jed + delta * i;
+      const [x, y, z] = Orbit.getPosAtTime(eph, j);
 
-      const pos = Orbit.getPosAtTime(eph, jed);
-      const vector = new THREE.Vector3(...pos);
-
-      points.push(vector);
+      const offset = i * 3;
+      positions[offset] = x;
+      positions[offset + 1] = y;
+      positions[offset + 2] = z;
     }
 
-    return new THREE.BufferGeometry().setFromPoints(points);
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+
+    return geometry;
+  }
+
+  static getOrbitResolution(eph, base = 90) {
+    // Scale resolution by eccentricity (for curvature) and size (for length)
+    const eccentricityFactor = Math.max(eph.e * 2, 1); // 1× to ~2×
+    const sizeFactor = Math.sqrt(eph.a); // √a scales with orbit size
+
+    // Final resolution
+    const parts = base * eccentricityFactor * sizeFactor;
+
+    // Clamp to reasonable bounds
+    return Math.max(32, Math.min(Math.floor(parts), 1024));
   }
 
   static getPeriodInDays(eph) {
