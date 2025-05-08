@@ -71,7 +71,11 @@ export default class Orbit {
     return line;
   }
 
-  static getOrbitGeometry(eph, jed, parts = 360) {
+  static getOrbitGeometry(eph, jed, baseResolution = 90) {
+    const eccentricityFactor = Math.max(eph.e * 2, 1); // More detail for elliptical orbits
+    const sizeFactor = Math.sqrt(eph.a); // More detail for large orbits
+    const parts = Math.floor(baseResolution * eccentricityFactor * sizeFactor);
+
     const positions = new Float32Array(parts * 3);
     const period = Orbit.getPeriodInDays(eph);
     const delta = period / parts;
