@@ -12,9 +12,12 @@ export default class Orrery3D {
     this.container = options.container || document.body;
     this.startDate = options.startDate || new Date(1980, 1);
     this.jedDelta = options.jedDelta || 1.5;
-    this.jed = toJED(this.startDate);
+    this.asteroidColor = new THREE.Color(options.asteroidColor || 0xaaaaaa);
+    this.asteroidDiscoveryColor = new THREE.Color(options.asteroidDiscoveryColor || 0x00ff00);
+    this.asteroidDiscoveryDuration = options.asteroidDiscoveryDuration || 500; // in Julian days
 
     this.planets = [];
+    this.jed = toJED(this.startDate);
     this.asteroidData = [];
     this.asteroidsDiscovered = 0;
 
@@ -81,46 +84,90 @@ export default class Orrery3D {
     });
   }
 
-  setAsteroids(asteroidData) {
+  setupAsteroids(asteroidData) {
+    // Sort by discovery date
+    asteroidData.sort((a, b) => a.disc - b.disc);
     this.asteroidData = asteroidData;
 
-    // Particle system for asteroids
+    // Geometry setup
     const geometry = new THREE.BufferGeometry();
-    const material = new THREE.PointsMaterial({
-      color: 0xaaaaaa,
-      size: 1,
-    });
-
     const positions = new Float32Array(asteroidData.length * 3);
+    const colors = new Float32Array(asteroidData.length * 3);
+
     geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+    geometry.setAttribute("color", new THREE.BufferAttribute(colors, 3));
     this.asteroidsGeometry = geometry;
+
+    // Initialize with default colors
+    for (let i = 0; i < asteroidData.length; ++i) {
+      colors[i * 3] = this.asteroidColor.r;
+      colors[i * 3 + 1] = this.asteroidColor.g;
+      colors[i * 3 + 2] = this.asteroidColor.b;
+    }
+
+    // Store HSL of discovery color
+    this.asteroidDiscoveryHSL = {};
+    this.asteroidDiscoveryColor.getHSL(this.asteroidDiscoveryHSL);
+
+    const material = new THREE.PointsMaterial({
+      size: 1,
+      vertexColors: true,
+      // color: 0xaaaaaa,
+    });
 
     const particleSystem = new THREE.Points(geometry, material);
     this.scene.add(particleSystem);
   }
 
-  renderAsteroids() {
-    const positions = this.asteroidsGeometry.attributes.position.array;
-    let index = 0;
-    let i;
+  updateAsteroids() {
+    // Precompute the fade cutoff JED at which the asteroid will be fully faded
+    const fadeCutoff = this.jed - this.asteroidDiscoveryDuration;
 
+    let i;
     for (i = 0; i < this.asteroidData.length; ++i) {
       const data = this.asteroidData[i];
 
-      if (data.disc > this.jed) {
-        break;
+      // Break if asteroid is not yet discovered
+      if (data.disc > this.jed) break;
+
+      const offset = i * 3;
+
+      // Calculate position and color
+      this.updateAsteroidPosition(data, offset);
+
+      // Only update color if asteroid is still fading
+      if (data.disc > fadeCutoff) {
+        this.updateAsteroidColor(data, offset);
       }
-
-      const [x, y, z] = Orbit.getPosAtTime(data, this.jed);
-
-      positions[index++] = x;
-      positions[index++] = y;
-      positions[index++] = z;
     }
 
-    this.asteroidsDiscovered = i + 1;
-    this.asteroidsGeometry.setDrawRange(0, this.asteroidsDiscovered);
+    // Update geometry
     this.asteroidsGeometry.attributes.position.needsUpdate = true;
+    this.asteroidsGeometry.attributes.color.needsUpdate = true;
+
+    // Update the number of asteroids to draw
+    this.asteroidsDiscovered = i;
+    this.asteroidsGeometry.setDrawRange(0, this.asteroidsDiscovered);
+  }
+
+  updateAsteroidPosition(data, offset) {
+    const [x, y, z] = Orbit.getPosAtTime(data, this.jed);
+    const positions = this.asteroidsGeometry.attributes.position.array;
+
+    positions[offset] = x;
+    positions[offset + 1] = y;
+    positions[offset + 2] = z;
+  }
+
+  updateAsteroidColor(data, offset) {
+    const ageJED = this.jed - data.disc;
+
+    const t = ageJED / this.asteroidDiscoveryDuration;
+    const c = this.asteroidsGeometry.attributes.color.array;
+
+    c[offset] = THREE.MathUtils.lerp(this.asteroidDiscoveryColor.r, this.asteroidColor.r, t);
+    c[offset + 1] = THREE.MathUtils.lerp(this.asteroidDiscoveryColor.g, this.asteroidColor.g, t);
+    c[offset + 2] = THREE.MathUtils.lerp(this.asteroidDiscoveryColor.b, this.asteroidColor.b, t);
   }
 
   render = () => {
@@ -133,7 +180,7 @@ export default class Orrery3D {
     this.planets.forEach((planet) => planet.render(this.jed));
 
     if (this.asteroidsGeometry) {
-      this.renderAsteroids();
+      this.updateAsteroids();
     }
 
     this.renderer.render(this.scene, this.camera);

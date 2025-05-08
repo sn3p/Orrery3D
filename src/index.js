@@ -12,10 +12,7 @@ const orrery = new Orrery3D({
 fetch(MPC_DATA_URL)
   .then((response) => response.json())
   .then((data) => {
-    // Sort by discovery date
-    data.sort((a, b) => a.disc - b.disc);
-
-    orrery.setAsteroids(data);
+    orrery.setupAsteroids(data);
   });
 
 // Window resize
