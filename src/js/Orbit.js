@@ -71,14 +71,11 @@ export default class Orbit {
     return line;
   }
 
-  static getOrbitGeometry(eph, jed, baseResolution = 90) {
-    const eccentricityFactor = Math.max(eph.e * 2, 1); // More detail for elliptical orbits
-    const sizeFactor = Math.sqrt(eph.a); // More detail for large orbits
-    const parts = Math.floor(baseResolution * eccentricityFactor * sizeFactor);
-
-    const positions = new Float32Array(parts * 3);
+  static getOrbitGeometry(eph, jed = J2000, baseResolution = 90) {
+    const parts = Orbit.getOrbitResolution(eph, baseResolution);
     const period = Orbit.getPeriodInDays(eph);
     const delta = period / parts;
+    const positions = new Float32Array(parts * 3);
 
     for (let i = 0; i < parts; ++i) {
       const j = jed + delta * i;
@@ -94,6 +91,18 @@ export default class Orbit {
     geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
 
     return geometry;
+  }
+
+  static getOrbitResolution(eph, base = 90) {
+    // Scale resolution by eccentricity (for curvature) and size (for length)
+    const eccentricityFactor = Math.max(eph.e * 2, 1); // 1× to ~2×
+    const sizeFactor = Math.sqrt(eph.a); // √a scales with orbit size
+
+    // Final resolution
+    const parts = base * eccentricityFactor * sizeFactor;
+
+    // Clamp to reasonable bounds
+    return Math.max(32, Math.min(Math.floor(parts), 1024));
   }
 
   static getPeriodInDays(eph) {
