@@ -72,20 +72,24 @@ export default class Orbit {
   }
 
   static getOrbitGeometry(eph, jed, parts = 360) {
-    const points = [];
+    const positions = new Float32Array(parts * 3);
     const period = Orbit.getPeriodInDays(eph);
     const delta = period / parts;
 
-    while (parts--) {
-      jed += delta;
+    for (let i = 0; i < parts; ++i) {
+      const j = jed + delta * i;
+      const [x, y, z] = Orbit.getPosAtTime(eph, j);
 
-      const pos = Orbit.getPosAtTime(eph, jed);
-      const vector = new THREE.Vector3(...pos);
-
-      points.push(vector);
+      const offset = i * 3;
+      positions[offset] = x;
+      positions[offset + 1] = y;
+      positions[offset + 2] = z;
     }
 
-    return new THREE.BufferGeometry().setFromPoints(points);
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+
+    return geometry;
   }
 
   static getPeriodInDays(eph) {
