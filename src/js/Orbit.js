@@ -30,7 +30,7 @@ export default class Orbit {
     let lastdiff;
 
     do {
-      const E1 = M + e * sin(E0);
+      const E1 = E0 - (E0 - e * sin(E0) - M) / (1 - e * cos(E0));
       lastdiff = Math.abs(E1 - E0);
       E0 = E1;
     } while (lastdiff > 0.0000001);
@@ -60,7 +60,7 @@ export default class Orbit {
       color: 0x333333,
       linewidth: 1,
       dashSize: 5,
-      gapSize: 3
+      gapSize: 3,
     });
 
     const line = new THREE.Line(geometry, material);
