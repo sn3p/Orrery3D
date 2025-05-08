@@ -84,7 +84,9 @@ export default class Orrery3D {
     });
   }
 
-  setAsteroids(asteroidData) {
+  setupAsteroids(asteroidData) {
+    // Sort by discovery date
+    asteroidData.sort((a, b) => a.disc - b.disc);
     this.asteroidData = asteroidData;
 
     // Geometry setup
@@ -96,38 +98,40 @@ export default class Orrery3D {
     geometry.setAttribute("color", new THREE.BufferAttribute(colors, 3));
     this.asteroidsGeometry = geometry;
 
+    // Initialize with default colors
+    for (let i = 0; i < asteroidData.length; ++i) {
+      colors[i * 3] = this.asteroidColor.r;
+      colors[i * 3 + 1] = this.asteroidColor.g;
+      colors[i * 3 + 2] = this.asteroidColor.b;
+    }
+
     // Store HSL of discovery color
     this.asteroidDiscoveryHSL = {};
     this.asteroidDiscoveryColor.getHSL(this.asteroidDiscoveryHSL);
-    this.tempColor = new THREE.Color(); // reusable scratch color
 
     const material = new THREE.PointsMaterial({
       size: 1,
       vertexColors: true,
+      // color: 0xaaaaaa,
     });
 
     const particleSystem = new THREE.Points(geometry, material);
     this.scene.add(particleSystem);
   }
 
-  renderAsteroids() {
-    let offset = 0;
+  updateAsteroids() {
     let i;
 
     for (i = 0; i < this.asteroidData.length; ++i) {
       const data = this.asteroidData[i];
 
       // Break if asteroid is not yet discovered
-      if (data.disc > this.jed) {
-        break;
-      }
+      if (data.disc > this.jed) break;
 
       // Calculate position and color
-      this.updateAsteroidPosition(data, offset);
-      this.updateAsteroidColor(data, offset);
-
-      // Update offset
-      offset += 3;
+      this.updateAsteroidPosition(data, i * 3);
+      // TODO: Only update color if not fully faded?
+      this.updateAsteroidColor(data, i * 3);
     }
 
     // Update geometry
@@ -141,15 +145,20 @@ export default class Orrery3D {
 
   updateAsteroidPosition(data, offset) {
     const [x, y, z] = Orbit.getPosAtTime(data, this.jed);
-
     const positions = this.asteroidsGeometry.attributes.position.array;
+
     positions[offset] = x;
     positions[offset + 1] = y;
     positions[offset + 2] = z;
   }
 
   updateAsteroidColor(data, offset) {
-    const t = THREE.MathUtils.clamp((this.jed - data.disc) / this.asteroidDiscoveryDuration, 0, 1);
+    const ageJED = this.jed - data.disc;
+
+    // Skip calculation if fully faded
+    if (ageJED >= this.asteroidDiscoveryDuration) return;
+
+    const t = ageJED / this.asteroidDiscoveryDuration;
     const c = this.asteroidsGeometry.attributes.color.array;
 
     c[offset] = THREE.MathUtils.lerp(this.asteroidDiscoveryColor.r, this.asteroidColor.r, t);
@@ -167,7 +176,7 @@ export default class Orrery3D {
     this.planets.forEach((planet) => planet.render(this.jed));
 
     if (this.asteroidsGeometry) {
-      this.renderAsteroids();
+      this.updateAsteroids();
     }
 
     this.renderer.render(this.scene, this.camera);
