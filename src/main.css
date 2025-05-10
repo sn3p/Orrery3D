@@ -31,3 +31,58 @@ body {
   bottom: 0;
   right: 0;
 }
+
+/*
+dat.GUI overrides
+*/
+
+.dg,
+.dg .c input {
+  font-family: Lucida Console, Courier, monospace !important;
+}
+
+.dg.a {
+  margin: 5px 5px 0 0 !important;
+}
+
+.dg li {
+  background: transparent !important;
+}
+
+.dg .cr {
+  border: 0 !important;
+}
+
+.dg .close-button {
+  display: none !important;
+}
+
+.dg .property-name {
+  color: #666 !important;
+  width: 20% !important;
+}
+
+.dg .c {
+  width: 80% !important;
+}
+
+.dg .slider {
+  width: 76% !important;
+}
+
+.dg .slider-fg {
+  background-color: #555 !important;
+}
+
+.dg .slider:hover .slider-fg {
+  background-color: #777 !important;
+}
+
+.dg .c input {
+  color: #777 !important;
+  width: 20% !important;
+}
+
+.dg .c:hover input {
+  color: #999 !important;
+}
