@@ -20,7 +20,7 @@ npm install
 Start server:
 
 ```bash
-npm run start
+npm run serve
 ```
 
 Build and bundle:

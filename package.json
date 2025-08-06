@@ -11,7 +11,7 @@
     "build": "webpack --config webpack.config.js --mode production",
     "deploy": "git subtree push --prefix dist origin gh-pages",
     "watch": "webpack --config webpack.config.js --mode development --watch",
-    "start": "webpack-dev-server --mode development --open"
+    "serve": "webpack-dev-server --mode development --open"
   },
   "dependencies": {
     "dat.gui": "^0.7.9",
