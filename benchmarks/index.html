@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Orrery3D rendering benchmark</title>
+<link rel="icon" href="data:,">
+<style>
+  body { margin: 0; background: black; color: white; font: 14px system-ui; }
+  canvas { display: block; }
+  #panel { position: fixed; left: 12px; top: 12px; max-width: calc(100vw - 48px); background: #151515ee; padding: 12px; border-radius: 6px; }
+  button { font: inherit; padding: 6px 10px; margin: 4px 4px 4px 0; }
+  #status { white-space: pre-wrap; overflow-wrap: anywhere; }
+  .stats { position: fixed; bottom: 10px; left: 12px; }
+  @media (max-width: 700px) { #panel { top: 52px; } }
+</style>
+<div id="orrery"></div>
+<div id="panel">
+  <strong>Orrery3D rendering benchmark</strong>
+  <p>Legacy CPU · optimized CPU · current GPU renderer. Keep this tab visible.</p>
+  <button id="run">Run comparison</button><button id="download" disabled>Download JSON</button>
+  <div id="status" role="status">Loading catalogue…</div>
+</div>
+<div class="stats"><span id="orrery-date"></span> · <span id="orrery-count"></span> asteroids · <span id="orrery-fps"></span></div>
+<script src="/benchmark.js"></script>
+</html>
