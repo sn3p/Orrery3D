@@ -77,6 +77,7 @@ async function main() {
         await page.waitForFunction(() => window.test.app.asteroidsDiscovered > 0);
         await checkUiTypography(page);
         const pausedRendering = await require("./rendering.cjs").testPausedRendering(page);
+        const pausedLifecycle = await require("./rendering.cjs").testPausedLifecycle(page);
         const result = await page.evaluate(() => {
           const { app, catalog, REFERENCE_JED, REBASE_DAYS, Orbit, Asteroids, THREE } = window.test;
           const check = (condition, message) => { if (!condition) throw new Error(message); };
@@ -187,6 +188,7 @@ async function main() {
           return { timing, catalog: catalog.length, fresh, faded, instant, hidden };
         });
         result.pausedRendering = pausedRendering;
+        result.pausedLifecycle = pausedLifecycle;
         result.shader = await page.evaluate(() => window.test.validateShader(window.test.app));
         const speed = page.getByRole("textbox", { name: "Playback speed" });
         await speed.fill("1.5"); await speed.press("Enter");
@@ -207,22 +209,28 @@ async function main() {
         await checkUiTypography(page);
         await page.screenshot({ path: path.join(output, `${name}-narrow.png`) });
         const lossSupported = await page.evaluate(() => !!window.test.app.renderer.getContext().getExtension("WEBGL_lose_context"));
-        const canvasImage = () => page.evaluate(() => {
-          const { app } = window.test;
-          app.renderer.render(app.scene, app.camera);
-          return app.renderer.domElement.toDataURL();
+        await page.evaluate(() => {
+          window.renderingProbe.capture = true;
+          window.test.app.requestRender();
         });
+        await page.waitForFunction(() => !!window.renderingProbe.image);
+        const canvasImage = () => page.evaluate(() => window.renderingProbe.image);
         for (let recovery = 0; lossSupported && recovery < 2; recovery++) {
           const beforeLoss = await canvasImage();
           await page.evaluate(() => window.test.app.renderer.forceContextLoss());
           await page.waitForFunction(() => window.test.app.contextLost);
+          const lostDraws = await page.evaluate(() => window.renderingProbe.draws);
+          assert.equal(await page.evaluate(() => window.test.app.animationFrame), null);
           assert.match(await page.locator("#orrery-status").textContent(), /Waiting to reconnect/);
           await page.waitForTimeout(100);
+          assert.equal(await page.evaluate(() => window.renderingProbe.draws), lostDraws);
           await page.evaluate(() => window.test.app.renderer.forceContextRestore());
-          await page.waitForFunction(() => !window.test.app.contextLost && window.test.app.renderer.info.render.points === 100000);
+          await page.waitForFunction(draws => !window.test.app.contextLost && window.renderingProbe.draws > draws
+            && window.test.app.renderer.info.render.points === 100000, lostDraws);
           assert(await page.locator("#orrery-status").isHidden());
-          assert.equal(await canvasImage(), beforeLoss, "Context restoration recovers the rendered scene");
+          assert.equal(await canvasImage(), beforeLoss, "Context restoration automatically recovers the rendered scene");
         }
+        if (lossSupported) result.runningContextRecovery = await require("./rendering.cjs").testRunningContextRecovery(page);
         await page.evaluate(() => {
           const { app, Orrery3D, catalog } = window.test;
           app.dispose(); app.dispose();
@@ -241,6 +249,9 @@ async function main() {
         await page.waitForFunction(() => Number(document.querySelector("#orrery-count").textContent) > 0);
         await checkUiTypography(page);
         assert(await page.locator("#orrery-status").isHidden());
+        assert.deepEqual(errors, []);
+        await require("./rendering.cjs").testPausedLoading(page, url + "/production/");
+        result.productionInteractions = await require("./rendering.cjs").testProductionInteractions(browser, url + "/production/", output, name);
         assert.deepEqual(errors, []);
         // Loading and failure through the real fetch/boot boundary.
         await page.route("**/data/catalog.json", async route => {
