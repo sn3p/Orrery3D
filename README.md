@@ -11,10 +11,20 @@ Two daily updated datasets are used to extract the orbital elements and discover
 
 ## How to use
 
+Use Node.js 24.19.0 (see `.nvmrc`). The build tools require Node.js
+`^22.22.3 || ^24.15.0 || >=26.0.0`.
+
+With nvm installed, select the project version first:
+
+```bash
+nvm install
+nvm use
+```
+
 Install dependencies:
 
 ```bash
-npm install
+npm ci
 ```
 
 Start server:
