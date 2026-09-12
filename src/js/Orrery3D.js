@@ -6,12 +6,13 @@ import Gui from "./Gui";
 import Sun from "./Sun";
 import Planet from "./Planet";
 import Orbit from "./Orbit";
+import PlaybackClock from "./PlaybackClock";
 
 export default class Orrery3D {
   constructor(options = {}) {
     this.container = options.container || document.body;
     this.startDate = options.startDate || new Date(1980, 1);
-    this.jedDelta = options.jedDelta || 1.5;
+    this.jedDelta = options.jedDelta ?? 1.5;
     this.asteroidColor = new THREE.Color(options.asteroidColor || 0x999999);
     this.asteroidDiscoveryColor = new THREE.Color(options.asteroidDiscoveryColor || 0x00ff00);
     this.asteroidDiscoveryDuration = options.asteroidDiscoveryDuration || 200; // in Julian days
@@ -20,6 +21,7 @@ export default class Orrery3D {
     this.planets = [];
     this.asteroidData = [];
     this.asteroidsDiscovered = 0;
+    this.clock = new PlaybackClock();
 
     // Setup GUI
     this.gui = new Gui(this);
@@ -27,6 +29,8 @@ export default class Orrery3D {
     // Create system
     this.createSystem();
     this.addPlanets(planetData);
+
+    document.addEventListener("visibilitychange", this.resetClock);
 
     // Start rendering
     this.render();
@@ -165,12 +169,18 @@ export default class Orrery3D {
     colors[offset + 2] = THREE.MathUtils.lerp(this.asteroidDiscoveryColor.b, this.asteroidColor.b, t);
   }
 
-  render = () => {
+  resetClock = () => { this.clock.reset(); };
+
+  render = (timestamp = performance.now()) => {
     requestAnimationFrame(this.render);
+    if (document.hidden) {
+      this.resetClock();
+      return;
+    }
 
     this.gui.stats.begin();
 
-    this.jed += this.jedDelta;
+    this.jed += this.clock.advance(timestamp, this.jedDelta);
 
     this.planets.forEach((planet) => planet.render(this.jed));
 
