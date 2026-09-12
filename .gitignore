@@ -11,3 +11,6 @@ yarn-error.log
 
 # Workspace files and generated browser-test/benchmark output
 .context/
+
+# Machine-local Conductor repository settings
+.conductor/settings.local.toml
