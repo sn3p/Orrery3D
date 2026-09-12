@@ -51,6 +51,7 @@ async function build(entry, directory) {
 }
 
 async function main() {
+  await require("./catalogue-preparation.cjs").testPurePreparation();
   await build("./tests/browser.js", path.join(output, "fixture"));
   await build("./src/index.js", path.join(output, "production"));
   const server = http.createServer((req, res) => {
@@ -76,6 +77,8 @@ async function main() {
         await page.evaluate(() => window.testReady);
         await page.waitForFunction(() => window.test.app.asteroidsDiscovered > 0);
         const saturn = await require("./planets.cjs")(page);
+        const cataloguePreparation = await require("./catalogue-preparation.cjs").testReplacement(page);
+        const transferredCloud = await require("./catalogue-preparation.cjs").testTransferredCloud(page);
         const catalogueReplacement = name === "chromium"
           ? await require("./catalogue-memory.cjs").testReplacement(page) : undefined;
         await checkUiTypography(page);
@@ -83,7 +86,7 @@ async function main() {
         const pausedRendering = await require("./rendering.cjs").testPausedRendering(page);
         const pausedLifecycle = await require("./rendering.cjs").testPausedLifecycle(page);
         const result = await page.evaluate(() => {
-          const { app, catalog, REFERENCE_JED, REBASE_DAYS, Orbit, Asteroids, THREE } = window.test;
+          const { app, catalog, REFERENCE_JED, REBASE_DAYS, Orbit, Asteroids, prepareCatalogue, THREE } = window.test;
           const check = (condition, message) => { if (!condition) throw new Error(message); };
           check(catalog.length === 100000, "Real catalogue must load");
           check(app.asteroids instanceof Asteroids && app.asteroids.frustumCulled, "Production uses bounded GPU cloud");
@@ -159,7 +162,7 @@ async function main() {
           check(app.scene.children.filter(child => child.isPoints).length === 1, "Replacement leaked point batches");
           // Colour checks use the real production material and framebuffer.
           const renderColors = (ages, duration) => {
-            const single = new Asteroids([{ ...sample, a: 1, e: 0, i: 0, W: 0, w: 0, wbar: 0, M: 0, n: 1, epoch: REFERENCE_JED, disc: REFERENCE_JED }], {
+            const single = new Asteroids(prepareCatalogue([{ ...sample, a: 1, e: 0, i: 0, W: 0, w: 0, wbar: 0, M: 0, n: 1, epoch: REFERENCE_JED, disc: REFERENCE_JED }], REFERENCE_JED), {
               jed: REFERENCE_JED, color: app.asteroidColor, discoveryColor: app.asteroidDiscoveryColor, discoveryDuration: duration,
             });
             single.material.size = 12;
@@ -263,6 +266,7 @@ async function main() {
         await require("./rendering.cjs").testPausedLoading(page, url + "/production/");
         result.productionInteractions = await require("./rendering.cjs").testProductionInteractions(browser, url + "/production/", output, name);
         assert.deepEqual(errors, []);
+        result.catalogueLoading = await require("./catalogue-preparation.cjs").testLoading(browser, url + "/production/");
         // Loading and failure through the real fetch/boot boundary.
         await page.route("**/data/catalog.json", async route => {
           await new Promise(resolve => setTimeout(resolve, 200));
@@ -292,7 +296,7 @@ async function main() {
           await require("./benchmark.cjs")(browser, output);
           result.benchmark = "resize interruption, recovery and JSON download passed";
         }
-        report.push({ browser: name, version: browser.version(), ...result, contextRecovery: lossSupported, checks: "passed" });
+        report.push({ browser: name, version: browser.version(), cataloguePreparation, transferredCloud, ...result, contextRecovery: lossSupported, checks: "passed" });
         fs.writeFileSync(path.join(output, "results.json"), JSON.stringify(report, null, 2));
         console.log(`${name}: production, controls, timing, discoveries, bounds, replacement, colours, recovery, errors, shader accuracy passed`);
       } finally { await browser.close(); }
