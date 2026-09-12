@@ -11,28 +11,31 @@
     "build": "webpack --config webpack.config.js --mode production",
     "deploy": "git subtree push --prefix dist origin gh-pages",
     "watch": "webpack --config webpack.config.js --mode development --watch",
-    "serve": "webpack-dev-server --mode development --open"
+    "serve": "webpack serve --mode development --open"
   },
   "dependencies": {
     "dat.gui": "^0.7.9",
-    "three": "^0.179.1"
+    "three": "^0.186.0"
   },
   "devDependencies": {
-    "@babel/core": "^7.28.0",
-    "@babel/preset-env": "^7.28.0",
-    "babel-loader": "^10.0.0",
-    "css-loader": "^7.1.2",
-    "cssnano": "^7.1.0",
+    "@babel/core": "^8.0.5",
+    "@babel/preset-env": "^8.0.5",
+    "babel-loader": "^10.1.1",
+    "css-loader": "^7.1.5",
+    "cssnano": "^9.0.4",
     "file-loader": "^6.2.0",
-    "html-webpack-plugin": "^5.6.3",
-    "mini-css-extract-plugin": "^2.9.3",
-    "postcss-import": "^16.1.1",
-    "postcss-loader": "^8.1.1",
-    "postcss-preset-env": "^10.2.4",
+    "html-webpack-plugin": "^5.6.8",
+    "mini-css-extract-plugin": "^2.10.2",
+    "postcss-import": "^17.0.0",
+    "postcss-loader": "^8.2.1",
+    "postcss-preset-env": "^11.5.2",
     "style-loader": "^4.0.0",
-    "terser-webpack-plugin": "^5.3.14",
-    "webpack": "^5.101.0",
-    "webpack-cli": "^6.0.1",
-    "webpack-dev-server": "^5.2.2"
+    "terser-webpack-plugin": "^5.6.1",
+    "webpack": "^5.110.3",
+    "webpack-cli": "^7.2.3",
+    "webpack-dev-server": "^6.0.0"
+  },
+  "engines": {
+    "node": "^22.22.3 || ^24.15.0 || >=26.0.0"
   }
 }
