@@ -83,11 +83,34 @@ BROWSERS=chromium,firefox,webkit npm test
 
 Tests build the real app and exercise loading, playback, discoveries, colours, camera controls, resizing, graphics recovery and errors. They also compare GPU positions against the orbital model across the full catalogue at 12 dates, check extreme elliptical orbits with an independent solver, and compare rendered pixels in overview and close views. Results and screenshots go to `.context/tests/`. WebKit testing is not a substitute for testing Safari and iOS on their actual devices.
 
-Deploy to gh-pages:
+## Deployment
+
+[GitHub Pages](https://sn3p.github.io/Orrery3D/) updates automatically after every
+push or merged pull request to `master`. The [GitHub Pages workflow](.github/workflows/pages.yml)
+installs locked dependencies with the Node.js version in `.nvmrc`, builds a clean
+`dist/` from source, and deploys it. Pull requests targeting `master` check the
+production build without deploying. A failed build prevents deployment.
+
+No local build, generated-file commit, or push to `gh-pages` is needed to deploy.
+The workflow publishes the checked-in catalogue; it does not download fresh MPC
+data.
+
+To deploy `master` again, open **Actions → GitHub Pages → Run workflow**, select
+`master`, or use the authenticated [GitHub CLI](https://cli.github.com/):
 
 ```bash
 npm run deploy
 ```
+
+This command deploys the remote `master` branch, including when run from a local
+feature branch; it does not publish uncommitted local changes. Check progress in
+the repository's [Actions tab](https://github.com/sn3p/Orrery3D/actions/workflows/pages.yml).
+
+Repository setup (once, also required for forks): in **Settings → Pages**, set
+**Build and deployment → Source** to **GitHub Actions**. In **Settings → Environments
+→ github-pages**, allow deployments from the `master` branch. The workflow must be
+merged into `master` before automatic or manual deployment is available. It uses
+GitHub's built-in token; no personal access token or deploy key is needed.
 
 ## Get updated data
 
