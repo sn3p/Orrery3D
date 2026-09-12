@@ -1,10 +1,10 @@
-module.exports = {
+module.exports = ({ mode }) => ({
   ident: "postcss",
   plugins: {
     "postcss-import": {},
     "postcss-preset-env": {
       minimumVendorImplementations: 2
     },
-    cssnano: {}
+    cssnano: mode === "production" ? {} : false
   }
-};
+});

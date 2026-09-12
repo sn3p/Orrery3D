@@ -61,7 +61,6 @@ module.exports = {
   ],
   optimization: {
     splitChunks: false,
-    minimize: true,
     minimizer: [
       new TerserPlugin({
         exclude: /hot-update\.js$/,
