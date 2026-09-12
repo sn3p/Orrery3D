@@ -10,10 +10,11 @@ on:
 permissions:
   contents: read
 
-# Queue updates without interrupting a deployment already in progress.
+# Retain up to 100 pending updates without interrupting the active deployment.
 concurrency:
   group: pages-${{ github.ref }}
   cancel-in-progress: false
+  queue: max
 
 jobs:
   build:

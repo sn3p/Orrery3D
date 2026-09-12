@@ -91,6 +91,10 @@ installs locked dependencies with the Node.js version in `.nvmrc`, builds a clea
 `dist/` from source, and deploys it. Pull requests targeting `master` check the
 production build without deploying. A failed build prevents deployment.
 
+Overlapping runs for the same branch retain up to 100 pending runs, processed in
+the order they enter GitHub's concurrency queue. New runs beyond that limit are
+canceled by GitHub; see the [queue documentation](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax#example-queueing-multiple-pending-runs).
+
 No local build, generated-file commit, or push to `gh-pages` is needed to deploy.
 The workflow publishes the checked-in catalogue; it does not download fresh MPC
 data.
