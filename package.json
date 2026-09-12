@@ -11,7 +11,7 @@
     "benchmark:serve": "node benchmarks/server.cjs",
     "setup": "cd data && ./download_data.sh && ./data_to_json.py",
     "build": "webpack --config webpack.config.js --mode production",
-    "deploy": "git subtree push --prefix dist origin gh-pages",
+    "deploy": "gh workflow run pages.yml --ref master",
     "watch": "webpack --config webpack.config.js --mode development --watch",
     "serve": "webpack serve --mode development --open",
     "test": "node tests/run.cjs"
