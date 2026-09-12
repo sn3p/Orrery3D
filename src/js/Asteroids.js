@@ -32,14 +32,15 @@ export const orbitGLSL = `
 function prepare(data, epoch) {
   if (!Array.isArray(data)) throw new Error("The asteroid catalogue must be an array.");
   // Reject invalid elements before allocating GPU resources or replacing a cloud.
-  data.forEach((d, index) => {
+  for (let index = 0; index < data.length; index++) {
+    const d = data[index];
     const valid = d && ["a", "e", "i", "W", "M", "epoch", "disc"].every(key => Number.isFinite(d[key]))
       && d.a > 0 && d.e >= 0 && d.e < 1
-      && (Number.isFinite(d.wbar) || Number.isFinite(d.w))
+      && Number.isFinite(d.wbar ?? d.w)
       && ((Number.isFinite(d.n) && d.n > 0) || (!d.n && Number.isFinite(d.P) && d.P > 0));
     // Float32 must still represent an ellipse, even when e is extremely near 1.
     if (!valid || Math.fround(d.e) >= 1) throw new Error(`Invalid elliptical orbit at catalogue entry ${index + 1}.`);
-  });
+  }
   const sorted = data.slice().sort((a, b) => a.disc - b.disc);
   const count = sorted.length;
   const p = new Float32Array(count * 3), q = new Float32Array(count * 3);

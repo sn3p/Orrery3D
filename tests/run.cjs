@@ -96,12 +96,26 @@ async function main() {
               check(Math.hypot(...Orbit.getPosAtTime(d, date)) <= cloud.geometry.boundingSphere.radius, "Conservative orbit bound");
             }
           }
-          for (const patch of [{ e: 1 }, { e: NaN }, { a: -1 }, { disc: Infinity }, { n: -1 }, { M: undefined }]) {
+          const invalidCatalogues = [new Array(1), [sample, , sample], [undefined], [null],
+            ...[{ e: 1 }, { e: NaN }, { a: -1 }, { disc: Infinity }, { n: -1 }, { M: undefined },
+              ...["", "20", NaN, Infinity, {}, false].map(wbar => ({ wbar, w: 10 }))]
+              .map(patch => [{ ...sample, ...patch }])];
+          for (const data of invalidCatalogues) {
             let rejected = false;
-            try { app.setupAsteroids([{ ...sample, ...patch }]); } catch { rejected = true; }
+            try { app.setupAsteroids(data); } catch { rejected = true; }
             check(rejected && app.asteroids === cloud, "Invalid catalogue replaced the working cloud");
           }
-          let disposed = false; cloud.geometry.addEventListener("dispose", () => { disposed = true; });
+          // Zero is a real longitude; only null/undefined select w + W.
+          for (const wbar of [0, null, undefined]) {
+            const d = { ...sample, wbar, w: 10, W: 25 };
+            app.setupAsteroids([d]);
+            const basis = Array.from(app.asteroidsGeometry.attributes.position.array);
+            app.setupAsteroids([{ ...d, wbar: wbar ?? 35 }]);
+            check(basis.every((v, i) => v === app.asteroidsGeometry.attributes.position.array[i]), "Longitude fallback changed orientation");
+          }
+          app.setupAsteroids(catalog);
+          const replaced = app.asteroids;
+          let disposed = false; replaced.geometry.addEventListener("dispose", () => { disposed = true; });
           app.setupAsteroids([]); check(disposed && app.asteroidsDiscovered === 0, "Empty replacement/disposal");
           app.setupAsteroids(catalog); app.jed = REFERENCE_JED; app.updateAsteroids();
           check(app.scene.children.filter(child => child.isPoints).length === 1, "Replacement leaked point batches");
