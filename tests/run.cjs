@@ -78,6 +78,7 @@ async function main() {
         const catalogueReplacement = name === "chromium"
           ? await require("./catalogue-memory.cjs").testReplacement(page) : undefined;
         await checkUiTypography(page);
+        const readoutBoundaries = await require("./readouts.cjs").testReadoutBoundaries(page);
         const pausedRendering = await require("./rendering.cjs").testPausedRendering(page);
         const pausedLifecycle = await require("./rendering.cjs").testPausedLifecycle(page);
         const result = await page.evaluate(() => {
@@ -190,6 +191,7 @@ async function main() {
           return { timing, catalog: catalog.length, fresh, faded, instant, hidden };
         });
         result.pausedRendering = pausedRendering;
+        result.readoutBoundaries = readoutBoundaries;
         result.pausedLifecycle = pausedLifecycle;
         result.catalogueReplacement = catalogueReplacement;
         result.shader = await page.evaluate(() => window.test.validateShader(window.test.app, window.test.catalog));
@@ -253,6 +255,7 @@ async function main() {
         await page.waitForFunction(() => Number(document.querySelector("#orrery-count").textContent) > 0);
         await checkUiTypography(page);
         assert(await page.locator("#orrery-status").isHidden());
+        result.productionReadouts = await require("./readouts.cjs").testProductionReadouts(page);
         assert.deepEqual(errors, []);
         await require("./rendering.cjs").testPausedLoading(page, url + "/production/");
         result.productionInteractions = await require("./rendering.cjs").testProductionInteractions(browser, url + "/production/", output, name);
