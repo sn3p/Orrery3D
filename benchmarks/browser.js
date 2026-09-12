@@ -9,9 +9,10 @@ const percentile = (values, p) => {
   return a.length ? a[Math.min(a.length - 1, Math.floor(a.length * p))] : null;
 };
 const summarize = values => ({ median: percentile(values, 0.5), p95: percentile(values, 0.95) });
-let catalog, app, active, lastReport, running = false;
+let catalog, app, active, lastReport, running = false, interrupted = false;
 function assert(condition, message) { if (!condition) throw new Error(message); }
 function assertAvailable() {
+  assert(!interrupted, "Benchmark interrupted; keep the tab visible and the window size unchanged, then run again.");
   assert(document.visibilityState === "visible", "Keep the benchmark tab visible; discard interrupted runs.");
   assert(!app.contextLost, "Graphics connection lost; run again after recovery.");
 }
@@ -68,6 +69,10 @@ async function measure(options) {
   assert(Number.isSafeInteger(warmup) && warmup >= 0 && Number.isSafeInteger(frames) && frames > 0 && Number.isFinite(step), "Invalid frame count/warmup/step");
   setup(options);
   running = true;
+  const interrupt = () => { interrupted = true; };
+  window.addEventListener("resize", interrupt);
+  document.addEventListener("visibilitychange", interrupt);
+  app.renderer.domElement.addEventListener("webglcontextlost", interrupt);
   let observer;
   const pending = [];
   const gl = app.renderer.getContext();
@@ -123,11 +128,16 @@ async function measure(options) {
     result.phaseRefresh = { updateMs: refresh.update, mainThreadMs: refresh.work,
       frameIntervalMs: (await nextFrame()) - beforeRefresh,
       uploadBytes: app.asteroidsGeometry.attributes.elements.array.byteLength, intervalDays: REBASE_DAYS };
+    assertAvailable();
     status.textContent = `GPU · ${options.count.toLocaleString()} objects · ${result.fps.toFixed(1)} FPS\nFrame p95: ${result.frameMs.p95.toFixed(2)} ms · CPU update median: ${result.asteroidUpdateMs.median.toFixed(2)} ms`;
     return result;
   } finally {
     pending.forEach(q => gl.deleteQuery(q));
     observer?.disconnect();
+    window.removeEventListener("resize", interrupt);
+    document.removeEventListener("visibilitychange", interrupt);
+    app.renderer.domElement.removeEventListener("webglcontextlost", interrupt);
+    interrupted = false;
     running = false;
   }
 }

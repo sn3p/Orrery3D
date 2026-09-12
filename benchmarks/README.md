@@ -16,7 +16,7 @@ CAMERA=close DPR=2 STEP=-1.5 COUNTS=100000 REPETITIONS=1 npm run benchmark
 npm run benchmark:serve
 ```
 
-Open the printed URL and select **Run benchmark**. Keep the tab visible and stop other rendering workloads. Restart the server after code changes. Interactive runs use the browser's native DPR and power policy; automated runs default to DPR 1 and disable Chrome Energy Saver in a disposable profile only. Your normal browser settings are unchanged.
+Open the printed URL and select **Run benchmark**. Keep the tab visible and stop other rendering workloads. Resizing, backgrounding or losing the graphics context interrupts a run; start it again once the window is stable. Restart the server after code changes. Interactive runs use the browser's native DPR and power policy; automated runs default to DPR 1 and disable Chrome Energy Saver in a disposable profile only. Your normal browser settings are unchanged.
 
 The automated runner saves JSON and a preview PNG to `.context/benchmark/`, then closes its browser/server. Results include source fingerprints, browser/GPU identity, power state, viewport, dates and individual samples. It refuses software rendering unless `ALLOW_SOFTWARE=1`. A headless run (`HEADLESS=1`) measures browser throughput; report it separately from headed results.
 

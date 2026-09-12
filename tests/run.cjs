@@ -230,6 +230,10 @@ async function main() {
         await page.reload(); await page.getByRole("alert").waitFor();
         assert.match(await page.getByRole("alert").textContent(), /WebGL 2 is required/);
         assert.equal(await page.locator(".dg.main").count(), 0, "No controls for an unavailable renderer");
+        if (name === "chromium") {
+          await require("./benchmark.cjs")(browser, output);
+          result.benchmark = "resize interruption, recovery and JSON download passed";
+        }
         report.push({ browser: name, version: browser.version(), ...result, contextRecovery: lossSupported, checks: "passed" });
         fs.writeFileSync(path.join(output, "results.json"), JSON.stringify(report, null, 2));
         console.log(`${name}: production, controls, timing, discoveries, bounds, replacement, colours, recovery, errors, shader accuracy passed`);
