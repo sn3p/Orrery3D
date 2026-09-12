@@ -124,8 +124,6 @@ export default class Asteroids extends THREE.Points {
     material.customProgramCacheKey = () => "asteroid-orbits-r186-v1";
     super(geometry, material);
     this.name = "Asteroids";
-    // Packed arrays own all runtime state, including graphics recovery. Do not
-    // retain the parsed catalogue objects once preparation has finished.
     this.discoveryDates = packed.dates;
     this.phases = packed.phases;
     this.epoch = jed;
