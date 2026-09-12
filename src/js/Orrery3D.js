@@ -23,6 +23,9 @@ export default class Orrery3D {
     this.asteroidData = [];
     this.asteroidsDiscovered = 0;
     this.clock = new PlaybackClock();
+    // Benchmarks can own a finite scheduler without starting an app loop.
+    this.autoRender = options.autoRender ?? true;
+    this.animationFrame = null;
     this.disposed = false;
     this.contextLost = false;
     this.statusMessage = "Loading asteroids…";
@@ -131,6 +134,16 @@ export default class Orrery3D {
 
   resetClock = () => { this.clock.reset(); };
 
+  requestRender = () => {
+    if (!this.autoRender || this.disposed || this.animationFrame !== null) return;
+    this.animationFrame = requestAnimationFrame(this.render);
+  };
+
+  cancelRender() {
+    cancelAnimationFrame(this.animationFrame);
+    this.animationFrame = null;
+  }
+
   onContextLost = () => {
     this.contextLost = true;
     this.resetClock();
@@ -148,7 +161,9 @@ export default class Orrery3D {
 
   render = (timestamp = performance.now()) => {
     if (this.disposed) return;
-    this.animationFrame = requestAnimationFrame(this.render);
+    // Also allow an explicit render to consume an already-requested frame.
+    this.cancelRender();
+    this.requestRender();
     if (document.hidden || this.contextLost) {
       this.resetClock();
       return;
@@ -181,7 +196,7 @@ export default class Orrery3D {
   dispose() {
     if (this.disposed) return;
     this.disposed = true;
-    cancelAnimationFrame(this.animationFrame);
+    this.cancelRender();
     document.removeEventListener("visibilitychange", this.resetClock);
     window.removeEventListener("resize", this.resize);
     this.renderer.domElement.removeEventListener("webglcontextlost", this.onContextLost);

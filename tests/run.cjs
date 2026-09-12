@@ -83,9 +83,8 @@ async function main() {
           check(app.asteroids instanceof Asteroids && app.asteroids.frustumCulled, "Production uses bounded GPU cloud");
           check(!app.asteroidsGeometry.attributes.color, "No dynamic CPU colour buffer");
           check(app.scene.children.filter(child => child.isPoints).length === 1, "One asteroid batch");
-          const originalRAF = window.requestAnimationFrame;
-          cancelAnimationFrame(app.animationFrame);
-          window.requestAnimationFrame = () => 0;
+          app.autoRender = false;
+          app.cancelRender();
           const timing = [];
           try {
             for (const hz of [30, 60, 120]) {
@@ -108,7 +107,7 @@ async function main() {
             app.render(300000); check(app.jed === before, "Visibility resume excludes hidden time");
             app.onContextLost(); app.render(400000); check(app.jed === before, "Context downtime does not advance");
             app.onContextRestored(); app.render(500000); check(app.jed === before, "Context resume excludes downtime");
-          } finally { window.requestAnimationFrame = originalRAF; app.jedDelta = 0; app.clock.reset(); app.render(); }
+          } finally { app.autoRender = true; app.jedDelta = 0; app.clock.reset(); app.render(); }
           const sample = catalog[50000];
           for (const date of [sample.disc - 0.001, sample.disc, sample.disc + 100, sample.disc + 201, sample.disc - 1, catalog[0].disc - 1, REFERENCE_JED]) {
             app.jed = date; app.updateAsteroids();
@@ -230,6 +229,7 @@ async function main() {
           replacement.dispose();
           if (document.querySelector("canvas, .dg.main")) throw new Error("Dispose left a canvas or controls");
         });
+        result.manualRendering = await require("./rendering.cjs").testManualRendering(page);
         await page.reload(); await page.evaluate(() => window.testReady);
         await page.waitForFunction(() => window.test.app.asteroidsDiscovered > 0);
         assert.deepEqual(errors, []);
