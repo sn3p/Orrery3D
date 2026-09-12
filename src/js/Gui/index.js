@@ -1,5 +1,6 @@
 import * as dat from "dat.gui";
 import { fromJED } from "../utils";
+import { UNIX_EPOCH_JULIAN_DATE } from "../constants";
 import Stats from "./Stats";
 
 export default class Gui {
@@ -10,6 +11,9 @@ export default class Gui {
     this.fpsElement = document.getElementById("orrery-fps");
     this.dateElement = document.getElementById("orrery-date");
     this.countElement = document.getElementById("orrery-count");
+    this.lastDay = null;
+    this.lastFps = null;
+    this.lastCount = null;
 
     // Performance stats tracker
     this.stats = new Stats();
@@ -23,10 +27,21 @@ export default class Gui {
   }
 
   update() {
-    const date = fromJED(this.orrery.jed).toISOString().slice(0, 10);
+    // Match Date's millisecond truncation, including times before the Unix epoch.
+    const milliseconds = Math.trunc((this.orrery.jed - UNIX_EPOCH_JULIAN_DATE) * 86400000);
+    const day = Math.floor(milliseconds / 86400000);
+    if (day !== this.lastDay) {
+      this.dateElement.textContent = fromJED(this.orrery.jed).toISOString().slice(0, 10);
+      this.lastDay = day;
+    }
 
-    this.dateElement.textContent = date;
-    this.fpsElement.textContent = `${this.stats.fps} FPS`;
-    this.countElement.textContent = this.orrery.asteroidsDiscovered;
+    if (this.stats.fps !== this.lastFps) {
+      this.fpsElement.textContent = `${this.stats.fps} FPS`;
+      this.lastFps = this.stats.fps;
+    }
+    if (this.orrery.asteroidsDiscovered !== this.lastCount) {
+      this.countElement.textContent = this.orrery.asteroidsDiscovered;
+      this.lastCount = this.orrery.asteroidsDiscovered;
+    }
   }
 }
