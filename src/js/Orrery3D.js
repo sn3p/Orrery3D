@@ -20,7 +20,6 @@ export default class Orrery3D {
 
     this._jed = toJED(this.startDate);
     this.planets = [];
-    this.asteroidData = [];
     this.asteroidsDiscovered = 0;
     this.clock = new PlaybackClock();
     // Benchmarks can own a finite scheduler without starting an app loop.
@@ -130,7 +129,6 @@ export default class Orrery3D {
       this.asteroids.dispose();
     }
     this.asteroids = asteroids;
-    this.asteroidData = asteroids.data;
     this.asteroidsGeometry = asteroids.geometry;
     this.scene.add(asteroids);
     this.updateAsteroids();

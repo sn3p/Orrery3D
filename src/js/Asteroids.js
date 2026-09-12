@@ -79,7 +79,7 @@ function prepare(data, epoch) {
       throw new Error(`Orbit exceeds rendering precision at catalogue entry ${index + 1}.`);
     }
   });
-  return { sorted, p, q, elements, discovery, phases, dates, radius };
+  return { p, q, elements, discovery, phases, dates, radius };
 }
 
 export default class Asteroids extends THREE.Points {
@@ -124,7 +124,6 @@ export default class Asteroids extends THREE.Points {
     material.customProgramCacheKey = () => "asteroid-orbits-r186-v1";
     super(geometry, material);
     this.name = "Asteroids";
-    this.data = packed.sorted;
     this.discoveryDates = packed.dates;
     this.phases = packed.phases;
     this.epoch = jed;
