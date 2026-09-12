@@ -32,6 +32,19 @@ body {
   right: 0;
 }
 
+.orrery-status {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  max-width: calc(100vw - 48px);
+  width: max-content;
+  padding: 12px;
+  color: #ccc;
+  background: #151515ee;
+  text-align: center;
+}
+
 /*
 dat.GUI overrides
 */

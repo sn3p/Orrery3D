@@ -23,15 +23,18 @@ export default class Orrery3D {
     this.asteroidData = [];
     this.asteroidsDiscovered = 0;
     this.clock = new PlaybackClock();
-
-    // Setup GUI
-    this.gui = new Gui(this);
+    this.disposed = false;
+    this.contextLost = false;
+    this.statusMessage = "Loading asteroids…";
 
     // Create system
     this.createSystem();
+    this.gui = new Gui(this);
     this.addPlanets(planetData);
 
     document.addEventListener("visibilitychange", this.resetClock);
+    window.addEventListener("resize", this.resize);
+    this.setStatus(this.statusMessage);
 
     // Start rendering
     this.render();
@@ -51,6 +54,13 @@ export default class Orrery3D {
 
     // Add renderer
     this.container.appendChild(this.renderer.domElement);
+    this.renderer.domElement.addEventListener("webglcontextlost", this.onContextLost);
+    this.renderer.domElement.addEventListener("webglcontextrestored", this.onContextRestored);
+    this.renderer.debug.onShaderError = (gl, program, vertex, fragment) => {
+      console.error("Unable to compile the scene shaders:", gl.getProgramInfoLog(program),
+        gl.getShaderInfoLog(vertex), gl.getShaderInfoLog(fragment));
+      this.setStatus("Unable to render this scene on your graphics device.", true);
+    };
 
     // Create camera
     this.camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.001, 2000000);
@@ -85,6 +95,7 @@ export default class Orrery3D {
   }
 
   setupAsteroids(data) {
+    if (this.disposed) return;
     const asteroids = new Asteroids(data, {
       jed: this.jed, color: this.asteroidColor,
       discoveryColor: this.asteroidDiscoveryColor,
@@ -99,6 +110,7 @@ export default class Orrery3D {
     this.asteroidsGeometry = asteroids.geometry;
     this.scene.add(asteroids);
     this.updateAsteroids();
+    this.setStatus("");
     this.clock.reset();
   }
 
@@ -106,11 +118,38 @@ export default class Orrery3D {
     this.asteroidsDiscovered = this.asteroids.update(this.jed);
   }
 
+  setStatus(message, error = false) {
+    this.statusMessage = message;
+    this.statusError = error;
+    const element = document.getElementById("orrery-status");
+    if (!element) return;
+    const text = this.contextLost ? "Graphics connection lost. Waiting to reconnect…" : message;
+    element.textContent = text;
+    element.hidden = !text;
+    element.setAttribute("role", error && !this.contextLost ? "alert" : "status");
+  }
+
   resetClock = () => { this.clock.reset(); };
 
+  onContextLost = () => {
+    this.contextLost = true;
+    this.resetClock();
+    // Release Three's old GPU caches/listeners while the context is lost.
+    // Geometry arrays and materials remain reusable and upload on restoration.
+    this.disposeSceneResources();
+    this.setStatus(this.statusMessage, this.statusError);
+  };
+
+  onContextRestored = () => {
+    this.contextLost = false;
+    this.resetClock();
+    this.setStatus(this.statusMessage, this.statusError);
+  };
+
   render = (timestamp = performance.now()) => {
-    requestAnimationFrame(this.render);
-    if (document.hidden) {
+    if (this.disposed) return;
+    this.animationFrame = requestAnimationFrame(this.render);
+    if (document.hidden || this.contextLost) {
       this.resetClock();
       return;
     }
@@ -135,6 +174,29 @@ export default class Orrery3D {
     this.camera.aspect = window.innerWidth / window.innerHeight;
     this.camera.updateProjectionMatrix();
 
+    this.renderer.setPixelRatio(window.devicePixelRatio);
     this.renderer.setSize(window.innerWidth, window.innerHeight);
   };
+
+  dispose() {
+    if (this.disposed) return;
+    this.disposed = true;
+    cancelAnimationFrame(this.animationFrame);
+    document.removeEventListener("visibilitychange", this.resetClock);
+    window.removeEventListener("resize", this.resize);
+    this.renderer.domElement.removeEventListener("webglcontextlost", this.onContextLost);
+    this.renderer.domElement.removeEventListener("webglcontextrestored", this.onContextRestored);
+    this.controls.dispose();
+    this.gui.gui.destroy();
+    this.disposeSceneResources();
+    this.renderer.dispose();
+    this.renderer.domElement.remove();
+  }
+
+  disposeSceneResources() {
+    this.scene.traverse(object => {
+      object.geometry?.dispose();
+      object.material?.dispose();
+    });
+  }
 }
