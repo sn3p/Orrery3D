@@ -15,20 +15,27 @@ async function checkUiTypography(page) {
       const { top, height } = document.querySelector(selector).getBoundingClientRect();
       return { top, height };
     };
+    // The floated label includes trailing space; measure the text itself.
+    const labelText = document.createRange();
+    labelText.selectNodeContents(document.querySelector(".dg .property-name"));
     return {
+      fontLoaded: [...document.fonts].some(font => font.family === "JetBrains Mono Variable" && font.status === "loaded"),
       readouts: ["#orrery-fps", "#orrery-date", "#orrery-count", "#orrery-status"].map(fontSize),
       label: fontSize(".dg .property-name"),
       inputFont: fontSize(".dg input"),
       input: bounds(".dg input"),
       slider: bounds(".dg .slider"),
-      labelRight: document.querySelector(".dg .property-name").getBoundingClientRect().right,
+      labelTextRight: labelText.getBoundingClientRect().right,
       sliderLeft: document.querySelector(".dg .slider").getBoundingClientRect().left,
     };
   });
-  assert(sizes.readouts.every(size => size === sizes.label), "Speed label matches all UI readout sizes");
-  assert(parseFloat(sizes.inputFont) < parseFloat(sizes.label), "Speed value uses smaller text");
+  assert(sizes.fontLoaded, "JetBrains Mono Variable loaded successfully");
+  assert(sizes.readouts.every(size => size === "14px"), "UI readouts use 14px text");
+  assert.equal(sizes.label, "14px", "Speed label uses 14px text");
+  assert.equal(sizes.inputFont, "12px", "Speed value uses 12px text");
+  assert.equal(sizes.input.height, 19, "Speed input is 19px high");
   assert.deepEqual(sizes.input, sizes.slider, "Speed input and slider share top edge and height");
-  assert(sizes.sliderLeft >= sizes.labelRight, "Slider leaves the speed label its full layout width");
+  assert(sizes.sliderLeft - sizes.labelTextRight >= 4, "Speed text keeps at least 4px of visible space before the slider");
 }
 
 async function build(entry, directory) {
