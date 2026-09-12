@@ -7,6 +7,7 @@
   "author": "Matthijs Kuiper <info@matthijskuiper.nl>",
   "license": "MIT",
   "scripts": {
+    "benchmark": "node benchmarks/run.cjs",
     "benchmark:serve": "node benchmarks/server.cjs",
     "setup": "cd data && ./download_data.sh && ./data_to_json.py",
     "build": "webpack --config webpack.config.js --mode production",
