@@ -35,15 +35,12 @@ function setup({ count, dpr = 1, camera = "overview", startJed = REFERENCE_JED }
 
 function frame(jed, beforeRender, afterRender) {
   assertAvailable();
-  app.gui.stats.begin();
   const start = performance.now();
-  app.jed = jed; app.updateAsteroids();
-  const updated = performance.now();
-  app.planets.forEach(planet => planet.render(jed));
-  beforeRender?.();
-  app.renderer.render(app.scene, app.camera);
-  afterRender?.();
-  app.gui.update(); app.gui.stats.end();
+  let updated;
+  app.renderFrame(jed, {
+    afterAsteroids: () => { updated = performance.now(); },
+    beforeRender, afterRender, trackFps: true,
+  });
   return { update: updated - start, work: performance.now() - start };
 }
 
@@ -177,7 +174,7 @@ window.benchmark = {
     catalog = data.slice().sort((a, b) => a.disc - b.disc);
     // Use the real app, but own scheduling for a finite and repeatable workload.
     app = new Orrery3D({ container: document.getElementById("orrery"), jedDelta: 0, autoRender: false });
-    app.gui.gui.hide();
+    app.gui.hide();
     await preview({ count: catalog.length, dpr: devicePixelRatio });
     status.textContent = `${catalog.length.toLocaleString()} catalogue entries loaded. Ready.`;
     run.disabled = false;

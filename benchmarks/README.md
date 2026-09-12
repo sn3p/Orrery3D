@@ -31,4 +31,6 @@ The automated runner saves JSON and a preview PNG to `.context/benchmark/`, then
 
 Counts above the bundled catalogue size **repeat the exact records and positions**. They test vertex/overlap load, not unique orbits or realistic larger-catalogue download, preparation and memory costs. `discovered`/`points` count submitted points, including overlapping and offscreen ones. The harness uses the real scene, materials and GUI updates with its own finite scheduler; the fixed date step makes runs repeatable.
 
+The app and benchmark both call `Orrery3D.renderFrame()` for asteroid/planet updates, drawing, FPS and readouts. It accepts an explicit date without advancing the playback clock or requesting another frame. Benchmark hooks mark the end of asteroid work and bracket draw submission; FPS tracking counts benchmark draws even at step zero, while ordinary paused app frames show 0 FPS.
+
 Options: `COUNTS`, `REPETITIONS`, `FRAMES`, `WARMUP`, `WIDTH`, `HEIGHT`, `DPR`, `CAMERA` (`overview`/`close`), `JED`, `STEP`, `OUTPUT`, `HEADLESS`, `BROWSER_PATH`, `ENERGY_SAVER` (`default` retains browser policy). Defaults: 1280 × 800 CSS pixels, JED 2458600.5, step 1.5 days/frame, 120 measured frames and 30 warmup frames. `STEP=0` pauses; negative values reverse. Count order reverses between repetitions. `PORT` configures the interactive server (default 3001).

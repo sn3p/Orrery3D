@@ -10,15 +10,10 @@ export default class Stats {
   reset() {
     this.fps = 0;
     this.frames = 0;
-    this.beginTime = this.performance.now();
-    this.prevTime = this.beginTime;
+    this.prevTime = this.performance.now();
   }
 
-  begin() {
-    this.beginTime = this.performance.now();
-  }
-
-  end() {
+  update() {
     this.frames++;
     const time = this.performance.now();
 
@@ -27,11 +22,5 @@ export default class Stats {
       this.prevTime = time;
       this.frames = 0;
     }
-
-    return time;
-  }
-
-  update() {
-    this.beginTime = this.end();
   }
 }
