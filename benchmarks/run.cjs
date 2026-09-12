@@ -38,8 +38,9 @@ async function main() {
     await page.goto(url); await page.evaluate(() => window.benchmark.ready); await page.bringToFront();
     const report = {
       timestamp: new Date().toISOString(),
+      workingTree: execFileSync("git", ["status", "--porcelain"], { encoding: "utf8" }).trim(),
       sourceCommit: execFileSync("git", ["rev-parse", "HEAD"], { encoding: "utf8" }).trim(),
-      harnessSha256: Object.fromEntries(["browser.js", "orbits.js", "run.cjs", "server.cjs", "index.html", "legacy-asteroids.js", "../src/js/Asteroids.js", "../src/js/Orrery3D.js", "../src/js/PlaybackClock.js"].map(file => [file,
+      harnessSha256: Object.fromEntries(["browser.js", "run.cjs", "server.cjs", "index.html", "../package-lock.json", "../src/js/Asteroids.js", "../src/js/Orrery3D.js", "../src/js/PlaybackClock.js"].map(file => [file,
         crypto.createHash("sha256").update(fs.readFileSync(path.join(__dirname, file))).digest("hex")
       ])),
       catalogueSha256: crypto.createHash("sha256").update(fs.readFileSync(path.join(__dirname, "../data/catalog.json"))).digest("hex"),
@@ -50,43 +51,35 @@ async function main() {
         return { charging: battery.charging, level: battery.level };
       }),
       environment: await page.evaluate(() => window.benchmark.environment()),
-      validation: null, results: [], errors,
+      results: [], errors,
     };
     console.log(JSON.stringify(report.environment));
     if (/swiftshader|llvmpipe|software/i.test(report.environment.gpu) && process.env.ALLOW_SOFTWARE !== "1") {
       throw new Error("Software rendering detected; refusing to report hardware GPU FPS.");
     }
-    report.validation = await page.evaluate(() => window.benchmark.validate());
-    console.log("Validation:", JSON.stringify(report.validation));
-    fs.writeFileSync(output, JSON.stringify(report, null, 2));
-    const modes = (process.env.MODES || "baseline,cpu,gpu,frozen").split(",");
     const counts = (process.env.COUNTS || "10000,100000,500000,1000000").split(",").map(Number);
     const repetitions = Number(process.env.REPETITIONS || 3);
+    if (!Number.isSafeInteger(repetitions) || repetitions < 1) throw new Error("REPETITIONS must be a positive integer.");
     for (let repeat = 0; repeat < repetitions; repeat++) {
-      // Rotate variant order and reverse count order to reduce systematic warm-up/thermal bias.
-      const order = [...modes.slice(repeat % modes.length), ...modes.slice(0, repeat % modes.length)];
+      // Reverse count order between repetitions to reduce systematic ordering bias.
       for (const count of repeat % 2 ? [...counts].reverse() : counts) {
-        for (const mode of order) {
-          const options = {
-            mode, count, repeat, dpr: Number(process.env.DPR || 1), camera: process.env.CAMERA || "overview",
-            frames: Number(process.env.FRAMES || 120), warmup: Number(process.env.WARMUP || 30),
-            step: Number(process.env.STEP || 1.5), startJed: Number(process.env.JED || 2458600.5),
-          };
-          const result = await page.evaluate(options => window.benchmark.measure(options), options);
-          report.results.push(result);
-          fs.writeFileSync(output, JSON.stringify(report, null, 2));
-          const { samples, ...summary } = result;
-          console.log(JSON.stringify(summary));
-        }
+        const options = {
+          count, repeat, dpr: Number(process.env.DPR || 1), camera: process.env.CAMERA || "overview",
+          frames: Number(process.env.FRAMES || 120), warmup: Number(process.env.WARMUP || 30),
+          step: Number(process.env.STEP || 1.5), startJed: Number(process.env.JED || 2458600.5),
+        };
+        const result = await page.evaluate(options => window.benchmark.measure(options), options);
+        report.results.push(result);
+        fs.writeFileSync(output, JSON.stringify(report, null, 2));
+        const { samples, ...summary } = result;
+        console.log(JSON.stringify(summary));
       }
     }
-    for (const mode of ["baseline", "cpu", "gpu"]) {
-      const preview = await page.evaluate(options => window.benchmark.preview(options), {
-        mode, count: 100000, dpr: Number(process.env.DPR || 1), camera: process.env.CAMERA || "overview",
-        startJed: Number(process.env.JED || 2458600.5), capture: true,
-      });
-      fs.writeFileSync(output.replace(/\.json$/, `-${mode}.png`), Buffer.from(preview.image.split(",")[1], "base64"));
-    }
+    const preview = await page.evaluate(options => window.benchmark.preview(options), {
+      count: counts[counts.length - 1], dpr: Number(process.env.DPR || 1), camera: process.env.CAMERA || "overview",
+      startJed: Number(process.env.JED || 2458600.5), capture: true,
+    });
+    fs.writeFileSync(path.join(path.dirname(output), path.parse(output).name + "-gpu.png"), Buffer.from(preview.image.split(",")[1], "base64"));
     fs.writeFileSync(output, JSON.stringify(report, null, 2));
     if (errors.length) throw new Error(`Browser errors: ${errors.join("\n")}`);
     console.log(`Saved ${output}`);
