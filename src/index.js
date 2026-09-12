@@ -1,6 +1,7 @@
 import Orrery3D from "./js/Orrery3D";
 import catalog from "../data/catalog.json";
 import "./main.css";
+import "./fonts/OFL.txt";
 
 const MPC_DATA_URL = catalog;
 

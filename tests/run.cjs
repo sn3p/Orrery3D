@@ -7,6 +7,30 @@ const browsers = require("playwright");
 const root = path.resolve(__dirname, "..");
 const output = path.join(root, ".context/tests");
 
+async function checkUiTypography(page) {
+  await page.evaluate(() => document.fonts.ready);
+  const sizes = await page.evaluate(() => {
+    const fontSize = selector => getComputedStyle(document.querySelector(selector)).fontSize;
+    const bounds = selector => {
+      const { top, height } = document.querySelector(selector).getBoundingClientRect();
+      return { top, height };
+    };
+    return {
+      readouts: ["#orrery-fps", "#orrery-date", "#orrery-count", "#orrery-status"].map(fontSize),
+      label: fontSize(".dg .property-name"),
+      inputFont: fontSize(".dg input"),
+      input: bounds(".dg input"),
+      slider: bounds(".dg .slider"),
+      labelRight: document.querySelector(".dg .property-name").getBoundingClientRect().right,
+      sliderLeft: document.querySelector(".dg .slider").getBoundingClientRect().left,
+    };
+  });
+  assert(sizes.readouts.every(size => size === sizes.label), "Speed label matches all UI readout sizes");
+  assert(parseFloat(sizes.inputFont) < parseFloat(sizes.label), "Speed value uses smaller text");
+  assert.deepEqual(sizes.input, sizes.slider, "Speed input and slider share top edge and height");
+  assert(sizes.sliderLeft >= sizes.labelRight, "Slider leaves the speed label its full layout width");
+}
+
 async function build(entry, directory) {
   const config = require("../webpack.config");
   await new Promise((resolve, reject) => {
@@ -44,6 +68,7 @@ async function main() {
         await page.goto(url + "/fixture/");
         await page.evaluate(() => window.testReady);
         await page.waitForFunction(() => window.test.app.asteroidsDiscovered > 0);
+        await checkUiTypography(page);
         const result = await page.evaluate(() => {
           const { app, catalog, REFERENCE_JED, REBASE_DAYS, Orbit, Asteroids, THREE } = window.test;
           const check = (condition, message) => { if (!condition) throw new Error(message); };
@@ -170,6 +195,7 @@ async function main() {
         await page.setViewportSize({ width: 390, height: 844 });
         await page.waitForFunction(() => document.querySelector("canvas").clientWidth === 390);
         const box = await speed.boundingBox(); assert(box.x >= 0 && box.x + box.width <= 390);
+        await checkUiTypography(page);
         await page.screenshot({ path: path.join(output, `${name}-narrow.png`) });
         const lossSupported = await page.evaluate(() => !!window.test.app.renderer.getContext().getExtension("WEBGL_lose_context"));
         const canvasImage = () => page.evaluate(() => {
@@ -203,6 +229,7 @@ async function main() {
         // Actual production build, without a test API.
         await page.goto(url + "/production/");
         await page.waitForFunction(() => Number(document.querySelector("#orrery-count").textContent) > 0);
+        await checkUiTypography(page);
         assert(await page.locator("#orrery-status").isHidden());
         assert.deepEqual(errors, []);
         // Loading and failure through the real fetch/boot boundary.

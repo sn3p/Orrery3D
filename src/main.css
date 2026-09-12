@@ -1,6 +1,20 @@
+@font-face {
+  font-family: "JetBrains Mono Variable";
+  src: url("./fonts/JetBrainsMono-Variable.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 100 800;
+  font-display: swap;
+}
+
+:root {
+  --font-ui: "JetBrains Mono Variable", "Lucida Console", Courier, monospace;
+  --font-ui-size: 14px;
+}
+
 body {
   background: black;
-  font-family: Lucida Console, Courier, monospace;
+  font-family: var(--font-ui);
+  font-size: var(--font-ui-size);
   margin: 0;
   overflow: hidden;
 }
@@ -51,7 +65,11 @@ dat.GUI overrides
 
 .dg,
 .dg .c input {
-  font-family: Lucida Console, Courier, monospace !important;
+  font-family: var(--font-ui) !important;
+}
+
+.dg {
+  font-size: var(--font-ui-size) !important;
 }
 
 .dg.a {
@@ -80,7 +98,8 @@ dat.GUI overrides
 }
 
 .dg .slider {
-  width: 76% !important;
+  margin-left: 0 !important;
+  width: calc(76% - 5px) !important;
 }
 
 .dg .slider-fg {
@@ -93,6 +112,10 @@ dat.GUI overrides
 
 .dg .c input {
   color: #777 !important;
+  font-size: 12px !important;
+  height: 19px !important;
+  line-height: 19px !important;
+  padding: 0 3px !important;
   width: 20% !important;
 }
 
