@@ -75,6 +75,8 @@ async function main() {
         await page.goto(url + "/fixture/");
         await page.evaluate(() => window.testReady);
         await page.waitForFunction(() => window.test.app.asteroidsDiscovered > 0);
+        const catalogueReplacement = name === "chromium"
+          ? await require("./catalogue-memory.cjs").testReplacement(page) : undefined;
         await checkUiTypography(page);
         const pausedRendering = await require("./rendering.cjs").testPausedRendering(page);
         const pausedLifecycle = await require("./rendering.cjs").testPausedLifecycle(page);
@@ -189,7 +191,8 @@ async function main() {
         });
         result.pausedRendering = pausedRendering;
         result.pausedLifecycle = pausedLifecycle;
-        result.shader = await page.evaluate(() => window.test.validateShader(window.test.app));
+        result.catalogueReplacement = catalogueReplacement;
+        result.shader = await page.evaluate(() => window.test.validateShader(window.test.app, window.test.catalog));
         const speed = page.getByRole("textbox", { name: "Playback speed" });
         await speed.fill("1.5"); await speed.press("Enter");
         assert.equal(await page.evaluate(() => window.test.app.jedDelta), 1.5);
@@ -244,6 +247,7 @@ async function main() {
         await page.reload(); await page.evaluate(() => window.testReady);
         await page.waitForFunction(() => window.test.app.asteroidsDiscovered > 0);
         assert.deepEqual(errors, []);
+        if (name === "chromium") result.catalogueMemory = await require("./catalogue-memory.cjs")(browser, url + "/production/");
         // Actual production build, without a test API.
         await page.goto(url + "/production/");
         await page.waitForFunction(() => Number(document.querySelector("#orrery-count").textContent) > 0);

@@ -65,8 +65,8 @@ function transformFeedback(packed, dates, epoch = REFERENCE_JED) {
 
 function packedAttributes(cloud) {
   const attributes = cloud.geometry.attributes;
-  const actual = new Float32Array(cloud.data.length * 10);
-  for (let i = 0; i < cloud.data.length; i++) {
+  const actual = new Float32Array(attributes.position.count * 10);
+  for (let i = 0; i < attributes.position.count; i++) {
     actual.set(attributes.position.array.subarray(i * 3, i * 3 + 3), i * 10);
     actual.set(attributes.basisQ.array.subarray(i * 3, i * 3 + 3), i * 10 + 3);
     actual.set(attributes.elements.array.subarray(i * 3, i * 3 + 3), i * 10 + 6);
@@ -104,8 +104,7 @@ function validateEccentricOrbits() {
 }
 
 
-export function validateShader(app) {
-  const catalog = app.asteroidData;
+export function validateShader(app, catalog) {
   const dates = [2378861.5, 2444270.5, REFERENCE_JED, REFERENCE_JED + 0.001,
     REFERENCE_JED + REBASE_DAYS - 0.001, REFERENCE_JED + REBASE_DAYS, REFERENCE_JED + REBASE_DAYS + 0.001,
     REFERENCE_JED, REFERENCE_JED - REBASE_DAYS + 0.001, REFERENCE_JED - REBASE_DAYS,
@@ -155,7 +154,7 @@ export function validateShader(app) {
   } finally { single.dispose(); }
   return { cataloguePositionsChecked: catalog.length * dates.length, dates, maxWorldError,
     maxOverviewCssPixelError, colorBoundaryChecks: colorDates.length,
-    eccentricOrbits: validateEccentricOrbits(), rendered: validateRenderedOutput(app) };
+    eccentricOrbits: validateEccentricOrbits(), rendered: validateRenderedOutput(app, catalog) };
 }
 
 // Static test oracle using the project's double-precision orbital model.
@@ -174,7 +173,7 @@ function referencePoints(catalog, jed) {
   return new THREE.Points(geometry, new THREE.PointsMaterial({ size: 1, vertexColors: true }));
 }
 
-function validateRenderedOutput(app) {
+function validateRenderedOutput(app, catalog) {
   const results = [], camera = app.camera.clone();
   const target = new THREE.WebGLRenderTarget(640, 400, { samples: 4 });
   const cloud = app.asteroids, originalJed = app.jed;
@@ -198,7 +197,7 @@ function validateRenderedOutput(app) {
       camera.lookAt(0, 0, 0); camera.updateMatrixWorld();
       cloud.update(jed);
       app.planets.forEach(planet => planet.render(jed));
-      const reference = referencePoints(app.asteroidData, jed);
+      const reference = referencePoints(catalog, jed);
       try {
         for (const surface of ["render-target", "canvas"]) {
           app.scene.remove(cloud); app.scene.add(reference);
