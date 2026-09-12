@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import Asteroids, { orbitGLSL, REFERENCE_JED, REBASE_DAYS } from "../src/js/Asteroids";
+import { prepareCatalogue } from "../src/js/prepareCatalogue";
 import Orbit from "../src/js/Orbit";
 
 const oldColor = new THREE.Color(0x999999), freshColor = new THREE.Color(0x00ff00);
@@ -80,7 +81,7 @@ function validateEccentricOrbits() {
     [0, 0.000001, -0.000001, 0.0001, -0.0001, 1, -1, 179.999, -179.999].map(M => ({
       a: 1, e, M, i: 0, W: 0, wbar: 0, n: 1, epoch: REFERENCE_JED, disc: REFERENCE_JED,
     })));
-  const cloud = new Asteroids(data, { jed: REFERENCE_JED, color: oldColor,
+  const cloud = new Asteroids(prepareCatalogue(data, REFERENCE_JED), { jed: REFERENCE_JED, color: oldColor,
     discoveryColor: freshColor, discoveryDuration: 200 });
   const output = transformFeedback(packedAttributes(cloud), [REFERENCE_JED])[0];
   cloud.dispose();
@@ -109,7 +110,7 @@ export function validateShader(app, catalog) {
     REFERENCE_JED + REBASE_DAYS - 0.001, REFERENCE_JED + REBASE_DAYS, REFERENCE_JED + REBASE_DAYS + 0.001,
     REFERENCE_JED, REFERENCE_JED - REBASE_DAYS + 0.001, REFERENCE_JED - REBASE_DAYS,
     REFERENCE_JED - REBASE_DAYS - 0.001, 2488070.5];
-  const cloud = new Asteroids(catalog, options);
+  const cloud = new Asteroids(prepareCatalogue(catalog, options.jed), options);
   const camera = app.camera.clone();
   camera.position.set(500, 500, 400); camera.lookAt(0, 0, 0); camera.updateMatrixWorld();
   const expectedVector = new THREE.Vector3(), actualVector = new THREE.Vector3();
@@ -140,7 +141,7 @@ export function validateShader(app, catalog) {
   } finally { cloud.dispose(); }
 
   const sample = catalog[Math.floor(catalog.length / 2)];
-  const single = new Asteroids([sample], options);
+  const single = new Asteroids(prepareCatalogue([sample], options.jed), options);
   const colorDates = [-1, 0, 100, 200, 201, 100, -1, 0, 0, 0.125].map(age => sample.disc + age);
   try {
     const output = transformFeedback(packedAttributes(single), colorDates);

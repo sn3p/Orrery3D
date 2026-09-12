@@ -7,6 +7,7 @@ import Sun from "./Sun";
 import Planet from "./Planet";
 import Orbit from "./Orbit";
 import Asteroids from "./Asteroids";
+import { prepareCatalogue } from "./prepareCatalogue";
 import PlaybackClock from "./PlaybackClock";
 
 export default class Orrery3D {
@@ -119,7 +120,8 @@ export default class Orrery3D {
 
   setupAsteroids(data) {
     if (this.disposed) return;
-    const asteroids = new Asteroids(data, {
+    const packed = prepareCatalogue(data, this.jed);
+    const asteroids = new Asteroids(packed, {
       jed: this.jed, color: this.asteroidColor,
       discoveryColor: this.asteroidDiscoveryColor,
       discoveryDuration: this.asteroidDiscoveryDuration,

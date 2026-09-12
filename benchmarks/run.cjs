@@ -40,7 +40,7 @@ async function main() {
       timestamp: new Date().toISOString(),
       workingTree: execFileSync("git", ["status", "--porcelain"], { encoding: "utf8" }).trim(),
       sourceCommit: execFileSync("git", ["rev-parse", "HEAD"], { encoding: "utf8" }).trim(),
-      harnessSha256: Object.fromEntries(["browser.js", "run.cjs", "server.cjs", "index.html", "../package-lock.json", "../src/js/Asteroids.js", "../src/js/Orrery3D.js", "../src/js/PlaybackClock.js"].map(file => [file,
+      harnessSha256: Object.fromEntries(["browser.js", "run.cjs", "server.cjs", "index.html", "../package-lock.json", "../src/js/Asteroids.js", "../src/js/prepareCatalogue.js", "../src/js/constants.js", "../src/js/Orrery3D.js", "../src/js/PlaybackClock.js"].map(file => [file,
         crypto.createHash("sha256").update(fs.readFileSync(path.join(__dirname, file))).digest("hex")
       ])),
       catalogueSha256: crypto.createHash("sha256").update(fs.readFileSync(path.join(__dirname, "../data/catalog.json"))).digest("hex"),
