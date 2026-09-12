@@ -76,6 +76,7 @@ async function main() {
         await page.evaluate(() => window.testReady);
         await page.waitForFunction(() => window.test.app.asteroidsDiscovered > 0);
         await checkUiTypography(page);
+        const pausedRendering = await require("./rendering.cjs").testPausedRendering(page);
         const result = await page.evaluate(() => {
           const { app, catalog, REFERENCE_JED, REBASE_DAYS, Orbit, Asteroids, THREE } = window.test;
           const check = (condition, message) => { if (!condition) throw new Error(message); };
@@ -97,7 +98,8 @@ async function main() {
             }
             app.jedDelta = 0; app.render(2000);
             const paused = app.jed; app.render(3000); check(app.jed === paused, "Pause");
-            app.jedDelta = -1.5; app.render(3016.6666667); check(app.jed < paused, "Reverse");
+            app.jedDelta = -1.5; app.render(3016.6666667); check(app.jed === paused, "First resumed frame excludes paused time");
+            app.render(3033.3333334); check(app.jed < paused, "Reverse");
             app.clock.reset(); const before = app.jed; app.render(100000); check(app.jed === before, "Resume does not catch up");
             Object.defineProperty(document, "hidden", { configurable: true, value: true });
             document.dispatchEvent(new Event("visibilitychange"));
@@ -184,6 +186,7 @@ async function main() {
           app.gui.gui.updateDisplay();
           return { timing, catalog: catalog.length, fresh, faded, instant, hidden };
         });
+        result.pausedRendering = pausedRendering;
         result.shader = await page.evaluate(() => window.test.validateShader(window.test.app));
         const speed = page.getByRole("textbox", { name: "Playback speed" });
         await speed.fill("1.5"); await speed.press("Enter");
@@ -191,7 +194,7 @@ async function main() {
         const date = await page.locator("#orrery-date").textContent();
         await page.waitForFunction(date => document.querySelector("#orrery-date").textContent > date, date);
         await speed.fill("0"); await speed.press("Enter");
-        await page.waitForFunction(() => parseInt(document.querySelector("#orrery-fps").textContent) > 0);
+        await page.waitForFunction(() => document.querySelector("#orrery-fps").textContent === "0 FPS");
         await page.screenshot({ path: path.join(output, `${name}-desktop.png`) });
         const before = await page.locator("canvas").screenshot();
         await page.mouse.move(600, 400); await page.mouse.down(); await page.mouse.move(750, 450, { steps: 12 }); await page.mouse.up();

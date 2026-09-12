@@ -4,6 +4,10 @@
 export default class Stats {
   constructor() {
     this.performance = performance || Date;
+    this.reset();
+  }
+
+  reset() {
     this.fps = 0;
     this.frames = 0;
     this.beginTime = this.performance.now();
