@@ -75,6 +75,7 @@ async function main() {
         await page.goto(url + "/fixture/");
         await page.evaluate(() => window.testReady);
         await page.waitForFunction(() => window.test.app.asteroidsDiscovered > 0);
+        const saturn = await require("./planets.cjs")(page);
         const catalogueReplacement = name === "chromium"
           ? await require("./catalogue-memory.cjs").testReplacement(page) : undefined;
         await checkUiTypography(page);
@@ -191,6 +192,7 @@ async function main() {
           return { timing, catalog: catalog.length, fresh, faded, instant, hidden };
         });
         result.pausedRendering = pausedRendering;
+        result.saturn = saturn;
         result.readoutBoundaries = readoutBoundaries;
         result.pausedLifecycle = pausedLifecycle;
         result.catalogueReplacement = catalogueReplacement;
@@ -248,6 +250,7 @@ async function main() {
         result.manualRendering = await require("./rendering.cjs").testManualRendering(page);
         await page.reload(); await page.evaluate(() => window.testReady);
         await page.waitForFunction(() => window.test.app.asteroidsDiscovered > 0);
+        result.saturnAfterReload = await require("./planets.cjs")(page);
         assert.deepEqual(errors, []);
         if (name === "chromium") result.catalogueMemory = await require("./catalogue-memory.cjs")(browser, url + "/production/");
         // Actual production build, without a test API.
