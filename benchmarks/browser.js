@@ -175,9 +175,8 @@ window.benchmark = {
   }).then(async data => {
     assert(Array.isArray(data) && data.length > 0, "Catalogue must be a nonempty array.");
     catalog = data.slice().sort((a, b) => a.disc - b.disc);
-    app = new Orrery3D({ container: document.getElementById("orrery"), jedDelta: 0 });
     // Use the real app, but own scheduling for a finite and repeatable workload.
-    cancelAnimationFrame(app.animationFrame);
+    app = new Orrery3D({ container: document.getElementById("orrery"), jedDelta: 0, autoRender: false });
     app.gui.gui.hide();
     await preview({ count: catalog.length, dpr: devicePixelRatio });
     status.textContent = `${catalog.length.toLocaleString()} catalogue entries loaded. Ready.`;

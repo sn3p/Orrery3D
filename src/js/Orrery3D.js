@@ -13,16 +13,19 @@ export default class Orrery3D {
   constructor(options = {}) {
     this.container = options.container || document.body;
     this.startDate = options.startDate || new Date(1980, 1);
-    this.jedDelta = options.jedDelta ?? 1.5;
+    this._jedDelta = options.jedDelta ?? 1.5;
     this.asteroidColor = new THREE.Color(options.asteroidColor ?? 0x999999);
     this.asteroidDiscoveryColor = new THREE.Color(options.asteroidDiscoveryColor ?? 0x00ff00);
     this.asteroidDiscoveryDuration = options.asteroidDiscoveryDuration ?? 200; // in Julian days
 
-    this.jed = toJED(this.startDate);
+    this._jed = toJED(this.startDate);
     this.planets = [];
     this.asteroidData = [];
     this.asteroidsDiscovered = 0;
     this.clock = new PlaybackClock();
+    // Benchmarks can own a finite scheduler without starting an app loop.
+    this.autoRender = options.autoRender ?? true;
+    this.animationFrame = null;
     this.disposed = false;
     this.contextLost = false;
     this.statusMessage = "Loading asteroids…";
@@ -32,13 +35,33 @@ export default class Orrery3D {
     this.gui = new Gui(this);
     this.addPlanets(planetData);
 
-    document.addEventListener("visibilitychange", this.resetClock);
+    document.addEventListener("visibilitychange", this.onVisibilityChange);
     window.addEventListener("resize", this.resize);
     this.setStatus(this.statusMessage);
 
     // Start rendering
     this.render();
   }
+
+  get jed() { return this._jed; }
+
+  set jed(value) {
+    if (Object.is(value, this._jed)) return;
+    this._jed = value;
+    this.requestRender();
+  }
+
+  get jedDelta() { return this._jedDelta; }
+
+  set jedDelta(value) {
+    if (Object.is(value, this._jedDelta)) return;
+    const wasPlaying = this.isPlaying;
+    this._jedDelta = value;
+    if (!wasPlaying || !this.isPlaying) this.resetClock();
+    this.requestRender();
+  }
+
+  get isPlaying() { return Number.isFinite(this.jedDelta) && this.jedDelta !== 0; }
 
   createSystem() {
     // Create scene
@@ -70,6 +93,7 @@ export default class Orrery3D {
 
     // Add controls
     this.controls = new OrbitControls(this.camera, this.renderer.domElement);
+    this.controls.addEventListener("change", this.requestRender);
 
     // Add Sun
     const sun = new Sun();
@@ -112,6 +136,7 @@ export default class Orrery3D {
     this.updateAsteroids();
     this.setStatus("");
     this.clock.reset();
+    this.requestRender();
   }
 
   updateAsteroids() {
@@ -129,10 +154,30 @@ export default class Orrery3D {
     element.setAttribute("role", error && !this.contextLost ? "alert" : "status");
   }
 
-  resetClock = () => { this.clock.reset(); };
+  resetClock = () => {
+    this.clock.reset();
+    this.gui.stats.reset();
+  };
+
+  onVisibilityChange = () => {
+    this.resetClock();
+    if (document.hidden) this.cancelRender();
+    else this.requestRender();
+  };
+
+  requestRender = () => {
+    if (!this.autoRender || this.disposed || document.hidden || this.contextLost || this.animationFrame !== null) return;
+    this.animationFrame = requestAnimationFrame(this.render);
+  };
+
+  cancelRender() {
+    cancelAnimationFrame(this.animationFrame);
+    this.animationFrame = null;
+  }
 
   onContextLost = () => {
     this.contextLost = true;
+    this.cancelRender();
     this.resetClock();
     // Release Three's old GPU caches/listeners while the context is lost.
     // Geometry arrays and materials remain reusable and upload on restoration.
@@ -144,11 +189,13 @@ export default class Orrery3D {
     this.contextLost = false;
     this.resetClock();
     this.setStatus(this.statusMessage, this.statusError);
+    this.requestRender();
   };
 
   render = (timestamp = performance.now()) => {
     if (this.disposed) return;
-    this.animationFrame = requestAnimationFrame(this.render);
+    // Also allow an explicit render to consume an already-requested frame.
+    this.cancelRender();
     if (document.hidden || this.contextLost) {
       this.resetClock();
       return;
@@ -156,7 +203,8 @@ export default class Orrery3D {
 
     this.gui.stats.begin();
 
-    this.jed += this.clock.advance(timestamp, this.jedDelta);
+    // Internal playback advances do not invalidate the paused scene.
+    this._jed += this.clock.advance(timestamp, this.jedDelta);
 
     this.planets.forEach((planet) => planet.render(this.jed));
 
@@ -166,8 +214,10 @@ export default class Orrery3D {
 
     this.renderer.render(this.scene, this.camera);
 
+    if (this.isPlaying) this.gui.stats.end();
+    else this.gui.stats.reset();
     this.gui.update();
-    this.gui.stats.end();
+    if (this.isPlaying) this.requestRender();
   };
 
   resize = () => {
@@ -176,16 +226,18 @@ export default class Orrery3D {
 
     this.renderer.setPixelRatio(window.devicePixelRatio);
     this.renderer.setSize(window.innerWidth, window.innerHeight);
+    this.requestRender();
   };
 
   dispose() {
     if (this.disposed) return;
     this.disposed = true;
-    cancelAnimationFrame(this.animationFrame);
-    document.removeEventListener("visibilitychange", this.resetClock);
+    this.cancelRender();
+    document.removeEventListener("visibilitychange", this.onVisibilityChange);
     window.removeEventListener("resize", this.resize);
     this.renderer.domElement.removeEventListener("webglcontextlost", this.onContextLost);
     this.renderer.domElement.removeEventListener("webglcontextrestored", this.onContextRestored);
+    this.controls.removeEventListener("change", this.requestRender);
     this.controls.dispose();
     this.gui.gui.destroy();
     this.disposeSceneResources();

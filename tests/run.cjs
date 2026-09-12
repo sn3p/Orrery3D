@@ -76,6 +76,8 @@ async function main() {
         await page.evaluate(() => window.testReady);
         await page.waitForFunction(() => window.test.app.asteroidsDiscovered > 0);
         await checkUiTypography(page);
+        const pausedRendering = await require("./rendering.cjs").testPausedRendering(page);
+        const pausedLifecycle = await require("./rendering.cjs").testPausedLifecycle(page);
         const result = await page.evaluate(() => {
           const { app, catalog, REFERENCE_JED, REBASE_DAYS, Orbit, Asteroids, THREE } = window.test;
           const check = (condition, message) => { if (!condition) throw new Error(message); };
@@ -83,9 +85,8 @@ async function main() {
           check(app.asteroids instanceof Asteroids && app.asteroids.frustumCulled, "Production uses bounded GPU cloud");
           check(!app.asteroidsGeometry.attributes.color, "No dynamic CPU colour buffer");
           check(app.scene.children.filter(child => child.isPoints).length === 1, "One asteroid batch");
-          const originalRAF = window.requestAnimationFrame;
-          cancelAnimationFrame(app.animationFrame);
-          window.requestAnimationFrame = () => 0;
+          app.autoRender = false;
+          app.cancelRender();
           const timing = [];
           try {
             for (const hz of [30, 60, 120]) {
@@ -98,7 +99,8 @@ async function main() {
             }
             app.jedDelta = 0; app.render(2000);
             const paused = app.jed; app.render(3000); check(app.jed === paused, "Pause");
-            app.jedDelta = -1.5; app.render(3016.6666667); check(app.jed < paused, "Reverse");
+            app.jedDelta = -1.5; app.render(3016.6666667); check(app.jed === paused, "First resumed frame excludes paused time");
+            app.render(3033.3333334); check(app.jed < paused, "Reverse");
             app.clock.reset(); const before = app.jed; app.render(100000); check(app.jed === before, "Resume does not catch up");
             Object.defineProperty(document, "hidden", { configurable: true, value: true });
             document.dispatchEvent(new Event("visibilitychange"));
@@ -108,7 +110,7 @@ async function main() {
             app.render(300000); check(app.jed === before, "Visibility resume excludes hidden time");
             app.onContextLost(); app.render(400000); check(app.jed === before, "Context downtime does not advance");
             app.onContextRestored(); app.render(500000); check(app.jed === before, "Context resume excludes downtime");
-          } finally { window.requestAnimationFrame = originalRAF; app.jedDelta = 0; app.clock.reset(); app.render(); }
+          } finally { app.autoRender = true; app.jedDelta = 0; app.clock.reset(); app.render(); }
           const sample = catalog[50000];
           for (const date of [sample.disc - 0.001, sample.disc, sample.disc + 100, sample.disc + 201, sample.disc - 1, catalog[0].disc - 1, REFERENCE_JED]) {
             app.jed = date; app.updateAsteroids();
@@ -185,6 +187,8 @@ async function main() {
           app.gui.gui.updateDisplay();
           return { timing, catalog: catalog.length, fresh, faded, instant, hidden };
         });
+        result.pausedRendering = pausedRendering;
+        result.pausedLifecycle = pausedLifecycle;
         result.shader = await page.evaluate(() => window.test.validateShader(window.test.app));
         const speed = page.getByRole("textbox", { name: "Playback speed" });
         await speed.fill("1.5"); await speed.press("Enter");
@@ -192,7 +196,7 @@ async function main() {
         const date = await page.locator("#orrery-date").textContent();
         await page.waitForFunction(date => document.querySelector("#orrery-date").textContent > date, date);
         await speed.fill("0"); await speed.press("Enter");
-        await page.waitForFunction(() => parseInt(document.querySelector("#orrery-fps").textContent) > 0);
+        await page.waitForFunction(() => document.querySelector("#orrery-fps").textContent === "0 FPS");
         await page.screenshot({ path: path.join(output, `${name}-desktop.png`) });
         const before = await page.locator("canvas").screenshot();
         await page.mouse.move(600, 400); await page.mouse.down(); await page.mouse.move(750, 450, { steps: 12 }); await page.mouse.up();
@@ -205,22 +209,28 @@ async function main() {
         await checkUiTypography(page);
         await page.screenshot({ path: path.join(output, `${name}-narrow.png`) });
         const lossSupported = await page.evaluate(() => !!window.test.app.renderer.getContext().getExtension("WEBGL_lose_context"));
-        const canvasImage = () => page.evaluate(() => {
-          const { app } = window.test;
-          app.renderer.render(app.scene, app.camera);
-          return app.renderer.domElement.toDataURL();
+        await page.evaluate(() => {
+          window.renderingProbe.capture = true;
+          window.test.app.requestRender();
         });
+        await page.waitForFunction(() => !!window.renderingProbe.image);
+        const canvasImage = () => page.evaluate(() => window.renderingProbe.image);
         for (let recovery = 0; lossSupported && recovery < 2; recovery++) {
           const beforeLoss = await canvasImage();
           await page.evaluate(() => window.test.app.renderer.forceContextLoss());
           await page.waitForFunction(() => window.test.app.contextLost);
+          const lostDraws = await page.evaluate(() => window.renderingProbe.draws);
+          assert.equal(await page.evaluate(() => window.test.app.animationFrame), null);
           assert.match(await page.locator("#orrery-status").textContent(), /Waiting to reconnect/);
           await page.waitForTimeout(100);
+          assert.equal(await page.evaluate(() => window.renderingProbe.draws), lostDraws);
           await page.evaluate(() => window.test.app.renderer.forceContextRestore());
-          await page.waitForFunction(() => !window.test.app.contextLost && window.test.app.renderer.info.render.points === 100000);
+          await page.waitForFunction(draws => !window.test.app.contextLost && window.renderingProbe.draws > draws
+            && window.test.app.renderer.info.render.points === 100000, lostDraws);
           assert(await page.locator("#orrery-status").isHidden());
-          assert.equal(await canvasImage(), beforeLoss, "Context restoration recovers the rendered scene");
+          assert.equal(await canvasImage(), beforeLoss, "Context restoration automatically recovers the rendered scene");
         }
+        if (lossSupported) result.runningContextRecovery = await require("./rendering.cjs").testRunningContextRecovery(page);
         await page.evaluate(() => {
           const { app, Orrery3D, catalog } = window.test;
           app.dispose(); app.dispose();
@@ -230,6 +240,7 @@ async function main() {
           replacement.dispose();
           if (document.querySelector("canvas, .dg.main")) throw new Error("Dispose left a canvas or controls");
         });
+        result.manualRendering = await require("./rendering.cjs").testManualRendering(page);
         await page.reload(); await page.evaluate(() => window.testReady);
         await page.waitForFunction(() => window.test.app.asteroidsDiscovered > 0);
         assert.deepEqual(errors, []);
@@ -238,6 +249,9 @@ async function main() {
         await page.waitForFunction(() => Number(document.querySelector("#orrery-count").textContent) > 0);
         await checkUiTypography(page);
         assert(await page.locator("#orrery-status").isHidden());
+        assert.deepEqual(errors, []);
+        await require("./rendering.cjs").testPausedLoading(page, url + "/production/");
+        result.productionInteractions = await require("./rendering.cjs").testProductionInteractions(browser, url + "/production/", output, name);
         assert.deepEqual(errors, []);
         // Loading and failure through the real fetch/boot boundary.
         await page.route("**/data/catalog.json", async route => {
