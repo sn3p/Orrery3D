@@ -30,7 +30,7 @@ The configured scripts are:
 | Entry | Starts | Port |
 | --- | --- | --- |
 | **app** (default) | The 3D app with automatic rebuilds | `CONDUCTOR_PORT` |
-| **benchmark** | The legacy CPU / optimized CPU / current GPU comparison; select **Run comparison** on the page | `CONDUCTOR_PORT + 1` |
+| **benchmark** | The production GPU benchmark; select an asteroid count and **Run benchmark** | `CONDUCTOR_PORT + 1` |
 
 Open the localhost URL printed in the run terminal. Each workspace gets its own ports, so both servers can run alongside other workspaces. **The app uses GPU asteroid orbits by default**, with no renderer setting or CPU fallback. Restart the benchmark server after changing benchmark code, and stop other rendering workloads before taking measurements.
 
@@ -40,7 +40,7 @@ If the script picker is unavailable, start the benchmark from a new Conductor te
 PORT=$((${CONDUCTOR_PORT:-3000} + 1)) npm run benchmark:serve
 ```
 
-Open the printed **Benchmark** URL and select **Run comparison**. This command can run alongside the app.
+Open the printed **Benchmark** URL and select **Run benchmark**. This command can run alongside the app.
 
 Shared defaults are in [`.conductor/settings.toml`](.conductor/settings.toml). Conductor's Mac app picks up shared settings after they reach the default branch; a repository-local `.conductor/settings.local.toml` in the main checkout can apply the same commands immediately. Outside Conductor, the commands below start the app on port 3000, and `npm run benchmark:serve` starts the benchmark on port 3001.
 
@@ -81,7 +81,7 @@ npx playwright install firefox webkit
 BROWSERS=chromium,firefox,webkit npm test
 ```
 
-Tests build the real app and exercise loading, playback, discoveries, colours, camera controls, resizing, graphics recovery and errors. Results and screenshots go to `.context/tests/`. WebKit testing is not a substitute for testing Safari and iOS on their actual devices.
+Tests build the real app and exercise loading, playback, discoveries, colours, camera controls, resizing, graphics recovery and errors. They also compare GPU positions against the orbital model across the full catalogue at 12 dates, check extreme elliptical orbits with an independent solver, and compare rendered pixels in overview and close views. Results and screenshots go to `.context/tests/`. WebKit testing is not a substitute for testing Safari and iOS on their actual devices.
 
 Deploy to gh-pages:
 
@@ -107,11 +107,15 @@ Larger catalogues increase download, parsing, preparation and memory costs even 
 ./data_to_json.py 9999
 ```
 
-## Performance investigation
+## Rendering
 
-Asteroid positions and discovery colours are calculated in a vertex shader within the existing single point batch. Playback follows elapsed time: speed `1` means 60 simulated days per second, `0` pauses, and negative speeds reverse. The default `1.5` preserves the old pace at 60 FPS. Hidden tabs and lost graphics contexts pause playback.
+Asteroid positions and discovery colours are calculated in a vertex shader within one point batch. Ordinary frames update time uniforms and the discovered draw range; they do not recalculate or upload every position in JavaScript. Planets and orbit lines still use the CPU orbital model.
 
-See the [GPU implementation and verification](docs/performance/gpu-renderer.md) and [original investigation](docs/performance/investigation.md) for measurements and remaining options. Run `npm run benchmark` for the reproducible comparison, or see the [benchmark instructions](benchmarks/README.md). The old JavaScript asteroid renderer exists only as a benchmark reference.
+Playback follows elapsed time: speed `1` means 60 simulated days per second, `0` pauses, and negative speeds reverse. The default `1.5` preserves the old pace at 60 FPS. Hidden tabs and lost graphics contexts pause playback.
+
+For maintenance: GPU attributes use Float32, so mean anomalies are refreshed from double-precision phases after a date change beyond 4096 days. This occasional O(N) update limits time-related precision loss. The culling sphere covers the largest full orbit, and the `position` attribute stores an orbital basis, not current coordinates; future picking must account for shader motion. Inputs must describe finite elliptical orbits, with eccentricity still below 1 when stored as Float32.
+
+Run `npm run benchmark` to measure the current renderer as asteroid count grows; see the [benchmark instructions](benchmarks/README.md). Timings depend on browser, GPU, display pacing and power settings. Larger benchmark counts repeat bundled records. Tests validate against this project's orbital model, not astronomical accuracy; new catalogue extremes, mobile GPUs and extreme zoom need separate verification.
 
 ## Screenshot
 
