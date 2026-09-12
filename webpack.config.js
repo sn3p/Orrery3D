@@ -30,6 +30,14 @@ module.exports = {
         ],
       },
       {
+        test: /\.(woff2|txt)$/,
+        include: path.resolve(__dirname, "src/fonts"),
+        type: "asset/resource",
+        generator: {
+          filename: "fonts/[name][ext]",
+        },
+      },
+      {
         test: /\.json$/,
         type: "javascript/auto",
         use: [
