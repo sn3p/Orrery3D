@@ -110,7 +110,7 @@ async function main() {
             const d = { ...sample, wbar, w: 10, W: 25 };
             app.setupAsteroids([d]);
             const basis = Array.from(app.asteroidsGeometry.attributes.position.array);
-            app.setupAsteroids([{ ...d, wbar: wbar ?? 35 }]);
+            app.setupAsteroids([{ ...d, wbar: undefined, w: wbar === 0 ? -25 : 10 }]);
             check(basis.every((v, i) => v === app.asteroidsGeometry.attributes.position.array[i]), "Longitude fallback changed orientation");
           }
           app.setupAsteroids(catalog);
@@ -153,6 +153,7 @@ async function main() {
           app.gui.gui.updateDisplay();
           return { timing, catalog: catalog.length, fresh, faded, instant, hidden };
         });
+        result.shader = await page.evaluate(() => window.test.validateShader(window.test.app));
         const speed = page.getByRole("textbox", { name: "Playback speed" });
         await speed.fill("1.5"); await speed.press("Enter");
         assert.equal(await page.evaluate(() => window.test.app.jedDelta), 1.5);
@@ -231,7 +232,7 @@ async function main() {
         assert.equal(await page.locator(".dg.main").count(), 0, "No controls for an unavailable renderer");
         report.push({ browser: name, version: browser.version(), ...result, contextRecovery: lossSupported, checks: "passed" });
         fs.writeFileSync(path.join(output, "results.json"), JSON.stringify(report, null, 2));
-        console.log(`${name}: production, controls, timing, discoveries, bounds, replacement, colours, recovery, errors passed`);
+        console.log(`${name}: production, controls, timing, discoveries, bounds, replacement, colours, recovery, errors, shader accuracy passed`);
       } finally { await browser.close(); }
     }
   } finally { await new Promise(resolve => server.close(resolve)); }
