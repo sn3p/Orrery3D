@@ -1,4 +1,4 @@
-import { PIXELS_PER_AU, J2000, YEAR, DEG_TO_RAD } from "./constants";
+import { PIXELS_PER_AU, J2000, DEG_TO_RAD } from "./constants";
 import * as THREE from "three";
 
 export default class Orbit {
@@ -75,7 +75,7 @@ export default class Orbit {
     const parts = Orbit.getOrbitResolution(eph, baseResolution);
     const period = Orbit.getPeriodInDays(eph);
     const delta = period / parts;
-    const positions = new Float32Array(parts * 3);
+    const positions = new Float32Array((parts + 1) * 3);
 
     for (let i = 0; i < parts; ++i) {
       const j = jed + delta * i;
@@ -86,6 +86,9 @@ export default class Orbit {
       positions[offset + 1] = y;
       positions[offset + 2] = z;
     }
+
+    // Repeat the first vertex exactly so the dashed line includes its closing segment.
+    positions.set(positions.subarray(0, 3), parts * 3);
 
     const geometry = new THREE.BufferGeometry();
     geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
@@ -106,6 +109,7 @@ export default class Orbit {
   }
 
   static getPeriodInDays(eph) {
-    return Math.sqrt(Math.pow(eph.a, 3)) * YEAR;
+    // Match getPosAtTime: mean motion takes precedence over the supplied period.
+    return eph.n ? 360 / eph.n : eph.P;
   }
 }
