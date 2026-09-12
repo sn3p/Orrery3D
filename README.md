@@ -4,10 +4,10 @@
 
 [Visualization](https://sn3p.github.io/Orrery3D) showing the orbits of [minor planets](https://en.wikipedia.org/wiki/Minor_planet) and their discovery over time.
 
-Two daily updated datasets are used to extract the orbital elements and discovery circumstances of minor planets. The data used is maintained by [The Minor Planet Center (MPC)](https://minorplanetcenter.net/):
+Two datasets are used to extract the orbital elements and discovery circumstances of minor planets. The data used is maintained by [The Minor Planet Center (MPC)](https://minorplanetcenter.net/):
 
 - [The MPC Orbit (MPCORB) Database](https://minorplanetcenter.net/iau/MPCORB.html) Database containing orbital elements of minor planets.
-- [NumberedMPs.txt](http://www.minorplanetcenter.net/iau/lists/NumberedMPs.txt) Discovery circumstances of the minor planets.
+- [NumberedMPs.txt](https://minorplanetcenter.net/iau/lists/NumberedMPs.txt) Discovery circumstances of numbered minor planets.
 
 ## How to use
 
@@ -91,21 +91,13 @@ npm run deploy
 
 ## Get updated data
 
-Data files are stored in the `data` directory.
-You can either download the data files manually using the links above, or use the download script:
+The bundled [`data/catalog.json`](data/catalog.json) contains **100,000 objects**. The app uses this checked-in snapshot; it does not fetch fresh MPC data at runtime.
 
-Download the data and parse it to JSON:
+An [import in Orrery](https://github.com/sn3p/Orrery/pull/49) on **12 September 2026** produced **895,910 objects with matching discovery dates** from **1,563,495 orbital records**. The other **667,585** were unnumbered objects without matching discovery records in `NumberedMPs.txt`. These are dated counts that change with MPC updates; see [Orrery issue #47](https://github.com/sn3p/Orrery/issues/47) for the source verification and discovery-date limitation.
 
-```bash
-cd data
-./download_data.sh && ./data_to_json.py
-```
+Orrery3D currently includes the generated catalogue only; the download/import scripts are not included in this repository. Shared catalogue tooling is being developed in [orrery-data](https://github.com/sn3p/orrery-data), and integration with this app is pending.
 
-Larger catalogues increase download, parsing, preparation and memory costs even with GPU rendering. The bundled catalogue contains 100,000 records; the benchmark's larger counts repeat those records. You can limit the maximum amount of results by passing a number as an argument:
-
-```bash
-./data_to_json.py 9999
-```
+Larger catalogues increase download, parsing, preparation and memory costs even with GPU rendering. The benchmark's larger counts repeat the bundled records and positions; the full 895,910-object export has not yet been validated in Orrery3D. The current discovery animation requires a finite discovery date for every object.
 
 ## Rendering
 
