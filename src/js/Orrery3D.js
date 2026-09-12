@@ -6,27 +6,35 @@ import Gui from "./Gui";
 import Sun from "./Sun";
 import Planet from "./Planet";
 import Orbit from "./Orbit";
+import Asteroids from "./Asteroids";
+import PlaybackClock from "./PlaybackClock";
 
 export default class Orrery3D {
   constructor(options = {}) {
     this.container = options.container || document.body;
     this.startDate = options.startDate || new Date(1980, 1);
-    this.jedDelta = options.jedDelta || 1.5;
-    this.asteroidColor = new THREE.Color(options.asteroidColor || 0x999999);
-    this.asteroidDiscoveryColor = new THREE.Color(options.asteroidDiscoveryColor || 0x00ff00);
-    this.asteroidDiscoveryDuration = options.asteroidDiscoveryDuration || 200; // in Julian days
+    this.jedDelta = options.jedDelta ?? 1.5;
+    this.asteroidColor = new THREE.Color(options.asteroidColor ?? 0x999999);
+    this.asteroidDiscoveryColor = new THREE.Color(options.asteroidDiscoveryColor ?? 0x00ff00);
+    this.asteroidDiscoveryDuration = options.asteroidDiscoveryDuration ?? 200; // in Julian days
 
     this.jed = toJED(this.startDate);
     this.planets = [];
     this.asteroidData = [];
     this.asteroidsDiscovered = 0;
-
-    // Setup GUI
-    this.gui = new Gui(this);
+    this.clock = new PlaybackClock();
+    this.disposed = false;
+    this.contextLost = false;
+    this.statusMessage = "Loading asteroids…";
 
     // Create system
     this.createSystem();
+    this.gui = new Gui(this);
     this.addPlanets(planetData);
+
+    document.addEventListener("visibilitychange", this.resetClock);
+    window.addEventListener("resize", this.resize);
+    this.setStatus(this.statusMessage);
 
     // Start rendering
     this.render();
@@ -46,6 +54,13 @@ export default class Orrery3D {
 
     // Add renderer
     this.container.appendChild(this.renderer.domElement);
+    this.renderer.domElement.addEventListener("webglcontextlost", this.onContextLost);
+    this.renderer.domElement.addEventListener("webglcontextrestored", this.onContextRestored);
+    this.renderer.debug.onShaderError = (gl, program, vertex, fragment) => {
+      console.error("Unable to compile the scene shaders:", gl.getProgramInfoLog(program),
+        gl.getShaderInfoLog(vertex), gl.getShaderInfoLog(fragment));
+      this.setStatus("Unable to render this scene on your graphics device.", true);
+    };
 
     // Create camera
     this.camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.001, 2000000);
@@ -79,98 +94,69 @@ export default class Orrery3D {
     });
   }
 
-  setupAsteroids(asteroidData) {
-    // Sort by discovery date
-    asteroidData.sort((a, b) => a.disc - b.disc);
-    this.asteroidData = asteroidData;
-
-    // Geometry setup
-    const geometry = new THREE.BufferGeometry();
-    const positions = new Float32Array(asteroidData.length * 3);
-    const colors = new Float32Array(asteroidData.length * 3);
-
-    geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
-    geometry.setAttribute("color", new THREE.BufferAttribute(colors, 3));
-    this.asteroidsGeometry = geometry;
-
-    // Initialize with default colors
-    for (let i = 0; i < asteroidData.length; ++i) {
-      colors[i * 3] = this.asteroidColor.r;
-      colors[i * 3 + 1] = this.asteroidColor.g;
-      colors[i * 3 + 2] = this.asteroidColor.b;
-    }
-
-    // Store HSL of discovery color
-    this.asteroidDiscoveryHSL = {};
-    this.asteroidDiscoveryColor.getHSL(this.asteroidDiscoveryHSL);
-
-    const material = new THREE.PointsMaterial({
-      size: 1,
-      vertexColors: true,
-      // color: 0xaaaaaa,
+  setupAsteroids(data) {
+    if (this.disposed) return;
+    const asteroids = new Asteroids(data, {
+      jed: this.jed, color: this.asteroidColor,
+      discoveryColor: this.asteroidDiscoveryColor,
+      discoveryDuration: this.asteroidDiscoveryDuration,
     });
-
-    const particleSystem = new THREE.Points(geometry, material);
-    this.scene.add(particleSystem);
+    if (this.asteroids) {
+      this.scene.remove(this.asteroids);
+      this.asteroids.dispose();
+    }
+    this.asteroids = asteroids;
+    this.asteroidData = asteroids.data;
+    this.asteroidsGeometry = asteroids.geometry;
+    this.scene.add(asteroids);
+    this.updateAsteroids();
+    this.setStatus("");
+    this.clock.reset();
   }
 
   updateAsteroids() {
-    // Precompute the fade cutoff JED at which the asteroid will be fully faded
-    const fadeCutoff = this.jed - this.asteroidDiscoveryDuration;
+    this.asteroidsDiscovered = this.asteroids.update(this.jed);
+  }
 
-    // Get the attributes that we need to update
-    const { position, color } = this.asteroidsGeometry.attributes;
+  setStatus(message, error = false) {
+    this.statusMessage = message;
+    this.statusError = error;
+    const element = document.getElementById("orrery-status");
+    if (!element) return;
+    const text = this.contextLost ? "Graphics connection lost. Waiting to reconnect…" : message;
+    element.textContent = text;
+    element.hidden = !text;
+    element.setAttribute("role", error && !this.contextLost ? "alert" : "status");
+  }
 
-    let i;
-    for (i = 0; i < this.asteroidData.length; ++i) {
-      const data = this.asteroidData[i];
+  resetClock = () => { this.clock.reset(); };
 
-      // Break if asteroid is not yet discovered
-      if (data.disc > this.jed) break;
+  onContextLost = () => {
+    this.contextLost = true;
+    this.resetClock();
+    // Release Three's old GPU caches/listeners while the context is lost.
+    // Geometry arrays and materials remain reusable and upload on restoration.
+    this.disposeSceneResources();
+    this.setStatus(this.statusMessage, this.statusError);
+  };
 
-      const offset = i * 3;
+  onContextRestored = () => {
+    this.contextLost = false;
+    this.resetClock();
+    this.setStatus(this.statusMessage, this.statusError);
+  };
 
-      // Calculate position and color
-      this.updateAsteroidPosition(data, offset, position.array);
-
-      // Only update color if asteroid is still fading
-      if (data.disc > fadeCutoff) {
-        this.updateAsteroidColor(data, offset, color.array);
-      }
+  render = (timestamp = performance.now()) => {
+    if (this.disposed) return;
+    this.animationFrame = requestAnimationFrame(this.render);
+    if (document.hidden || this.contextLost) {
+      this.resetClock();
+      return;
     }
-
-    // Update geometry
-    this.asteroidsGeometry.attributes.position.needsUpdate = true;
-    this.asteroidsGeometry.attributes.color.needsUpdate = true;
-
-    // Update the number of asteroids to draw
-    this.asteroidsDiscovered = i;
-    this.asteroidsGeometry.setDrawRange(0, this.asteroidsDiscovered);
-  }
-
-  updateAsteroidPosition(data, offset, positions) {
-    const [x, y, z] = Orbit.getPosAtTime(data, this.jed);
-
-    positions[offset] = x;
-    positions[offset + 1] = y;
-    positions[offset + 2] = z;
-  }
-
-  updateAsteroidColor(data, offset, colors) {
-    const ageJED = this.jed - data.disc;
-    const t = ageJED / this.asteroidDiscoveryDuration;
-
-    colors[offset] = THREE.MathUtils.lerp(this.asteroidDiscoveryColor.r, this.asteroidColor.r, t);
-    colors[offset + 1] = THREE.MathUtils.lerp(this.asteroidDiscoveryColor.g, this.asteroidColor.g, t);
-    colors[offset + 2] = THREE.MathUtils.lerp(this.asteroidDiscoveryColor.b, this.asteroidColor.b, t);
-  }
-
-  render = () => {
-    requestAnimationFrame(this.render);
 
     this.gui.stats.begin();
 
-    this.jed += this.jedDelta;
+    this.jed += this.clock.advance(timestamp, this.jedDelta);
 
     this.planets.forEach((planet) => planet.render(this.jed));
 
@@ -188,6 +174,29 @@ export default class Orrery3D {
     this.camera.aspect = window.innerWidth / window.innerHeight;
     this.camera.updateProjectionMatrix();
 
+    this.renderer.setPixelRatio(window.devicePixelRatio);
     this.renderer.setSize(window.innerWidth, window.innerHeight);
   };
+
+  dispose() {
+    if (this.disposed) return;
+    this.disposed = true;
+    cancelAnimationFrame(this.animationFrame);
+    document.removeEventListener("visibilitychange", this.resetClock);
+    window.removeEventListener("resize", this.resize);
+    this.renderer.domElement.removeEventListener("webglcontextlost", this.onContextLost);
+    this.renderer.domElement.removeEventListener("webglcontextrestored", this.onContextRestored);
+    this.controls.dispose();
+    this.gui.gui.destroy();
+    this.disposeSceneResources();
+    this.renderer.dispose();
+    this.renderer.domElement.remove();
+  }
+
+  disposeSceneResources() {
+    this.scene.traverse(object => {
+      object.geometry?.dispose();
+      object.material?.dispose();
+    });
+  }
 }

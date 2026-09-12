@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Orrery3D rendering benchmark</title>
+<link rel="icon" href="data:,">
+<style>
+  body { margin: 0; background: black; color: white; font: 14px system-ui; }
+  canvas { display: block; }
+  #panel { position: fixed; left: 12px; top: 12px; max-width: calc(100vw - 48px); background: #151515ee; padding: 12px; border-radius: 6px; }
+  button, select { font: inherit; padding: 6px 10px; margin: 4px 4px 4px 0; }
+  #status { white-space: pre-wrap; overflow-wrap: anywhere; }
+  .stats { position: fixed; bottom: 10px; left: 12px; }
+  #orrery-fps { display: none; }
+</style>
+<div id="orrery"></div>
+<div id="panel">
+  <strong>Orrery3D rendering benchmark</strong>
+  <p>Production GPU renderer. Keep this tab visible.</p>
+  <p>Counts above the catalogue size repeat the same orbits.</p>
+  <label for="count">Asteroids</label>
+  <select id="count">
+    <option value="10000">10,000</option>
+    <option value="100000" selected>100,000</option>
+    <option value="500000">500,000</option>
+    <option value="1000000">1,000,000</option>
+  </select><br>
+  <button id="run" disabled>Run benchmark</button><button id="download" disabled>Download JSON</button>
+  <div id="status" role="status">Loading catalogue…</div>
+</div>
+<div class="stats"><span id="orrery-date"></span> · <span id="orrery-count"></span> asteroids<span id="orrery-fps"></span></div>
+<script src="/benchmark.js"></script>
+</html>

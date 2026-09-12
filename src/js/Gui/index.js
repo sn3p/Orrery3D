@@ -16,7 +16,10 @@ export default class Gui {
 
     // Controls
     this.gui = new dat.GUI({ hideable: false });
-    this.gui.add(this.orrery, "jedDelta", -8, 8).name("speed");
+    const speed = this.gui.add(this.orrery, "jedDelta", -8, 8).name("speed");
+    const input = speed.domElement.querySelector("input");
+    input.setAttribute("aria-label", "Playback speed");
+    input.title = "0 pauses; negative reverses. 1 = 60 days per second.";
   }
 
   update() {

@@ -2,6 +2,7 @@
 <html lang="en">
   <head>
     <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Orrery3D</title>
     <meta name="description" content="3D minor planet orbits and discovery visualization">
     <link rel="stylesheet" href="<%= htmlWebpackPlugin.files.css[0] %>">
@@ -11,6 +12,7 @@
     <div class="orrery-fps" id="orrery-fps"></div>
     <div class="orrery-date" id="orrery-date"></div>
     <div class="orrery-count" id="orrery-count"></div>
+    <div class="orrery-status" id="orrery-status" role="status">Loading asteroids…</div>
 
     <script src="<%= htmlWebpackPlugin.files.js[0] %>"></script>
   </body>

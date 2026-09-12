@@ -1,4 +1,4 @@
-# Dependancies
+# Dependencies
 node_modules/
 
 # OS files
@@ -8,3 +8,9 @@ node_modules/
 npm-debug.log
 yarn-debug.log
 yarn-error.log
+
+# Workspace files and generated browser-test/benchmark output
+.context/
+
+# Machine-local Conductor repository settings
+.conductor/settings.local.toml
