@@ -64,7 +64,9 @@ export default [
       w: 114.20783,
       wbar: 102.94719,
       L: 100.46435,
-      M: -2.47311027,
+      // L - wbar from this same J2000 element set:
+      // https://nssdc.gsfc.nasa.gov/planetary/factsheet/earthfact.html
+      M: -2.48284,
       P: 365.256
     }
   },

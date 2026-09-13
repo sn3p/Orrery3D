@@ -79,6 +79,7 @@ async function main() {
         const sharedFrames = await require("./frame-operations.cjs").testSharedFrames(page);
         const fps = await require("./frame-operations.cjs").testFps(page);
         const saturn = await require("./planets.cjs")(page);
+        const earth = await require("./earth.cjs")(page);
         const orbitTracks = await require("./orbit-tracks.cjs")(page);
         const cpuOrbits = await require("./cpu-orbits.cjs").testNumerics(page);
         const cpuScene = await require("./cpu-orbits.cjs").testScene(page);
@@ -204,6 +205,7 @@ async function main() {
         result.fps = fps;
         result.pausedRendering = pausedRendering;
         result.saturn = saturn;
+        result.earth = earth;
         result.orbitTracks = orbitTracks;
         result.cpuOrbits = cpuOrbits;
         result.cpuScene = cpuScene;
@@ -267,6 +269,7 @@ async function main() {
         await page.reload(); await page.evaluate(() => window.testReady);
         await page.waitForFunction(() => window.test.app.asteroidsDiscovered > 0);
         result.saturnAfterReload = await require("./planets.cjs")(page);
+        result.earthAfterReload = await require("./earth.cjs")(page);
         result.orbitTracksAfterReload = await require("./orbit-tracks.cjs")(page);
         result.cpuSceneAfterReload = await require("./cpu-orbits.cjs").testScene(page);
         assert.deepEqual(errors, []);
