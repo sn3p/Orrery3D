@@ -57,6 +57,8 @@ jobs:
           BROWSERS: ${{ matrix.browser }}
           # Firefox needs an X display for WebGL 2 on the Linux runner.
           HEADLESS: ${{ matrix.headless }}
+          # Use Mesa for reproducible software GL, including Chrome via ANGLE.
+          LIBGL_ALWAYS_SOFTWARE: "1"
         run: |
           mkdir -p .context/test-logs
           set -o pipefail

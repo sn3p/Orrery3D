@@ -76,7 +76,12 @@ async function main() {
   try {
     for (const name of (process.env.BROWSERS || "chromium").split(",")) {
       diagnostics.stage(`${name}: launch`);
-      const instance = await browsers[name].launch({ headless: process.env.HEADLESS !== "0", ...(name === "chromium" ? { channel: "chrome" } : {}) });
+      const linuxCI = process.env.CI === "true" && process.platform === "linux";
+      const instance = await browsers[name].launch({ headless: process.env.HEADLESS !== "0",
+        ...(name === "chromium" ? { channel: "chrome",
+          // SwiftShader's trigonometric approximations exceed our unchanged
+          // orbital-error bound. Use Mesa's GL implementation in Linux CI.
+          ...(linuxCI ? { args: ["--use-angle=gl", "--ignore-gpu-blocklist"] } : {}) } : {}) });
       try {
         diagnostics.stage(`${name}: diagnostic failure regressions`);
         const diagnosticChecks = await require("./diagnostics-regression.cjs")(instance, output, name);
@@ -87,9 +92,11 @@ async function main() {
           const gl = document.createElement("canvas").getContext("webgl2");
           if (!gl) return null;
           const debug = gl.getExtension("WEBGL_debug_renderer_info");
-          return { vendor: gl.getParameter(debug ? debug.UNMASKED_VENDOR_WEBGL : gl.VENDOR),
+          const graphics = { vendor: gl.getParameter(debug ? debug.UNMASKED_VENDOR_WEBGL : gl.VENDOR),
             renderer: gl.getParameter(debug ? debug.UNMASKED_RENDERER_WEBGL : gl.RENDERER),
             version: gl.getParameter(gl.VERSION), shadingLanguage: gl.getParameter(gl.SHADING_LANGUAGE_VERSION) };
+          gl.getExtension("WEBGL_lose_context")?.loseContext();
+          return graphics;
         });
         Object.assign(diagnostics.run.browsers.at(-1), { headless: process.env.HEADLESS !== "0", graphics });
         diagnostics.save();

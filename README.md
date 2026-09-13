@@ -102,6 +102,11 @@ and WebKit jobs. Deployment requires the build and all three browser checks to
 pass. Pull requests targeting `master` run the same checks without deploying.
 Linux Firefox runs with a virtual display because its headless mode does not
 provide the WebGL 2 context required by this suite.
+Linux CI uses Mesa software GL (Chrome selects ANGLE's OpenGL backend). SwiftShader's
+trigonometric approximations exceed the existing orbital-error bound; the suite
+keeps the same shader and accuracy thresholds on the selected CI backend. Its
+reported renderer identifies the backend actually used. Local runs use the browser
+defaults, so CI does not establish accuracy on every graphics driver.
 
 Each browser job retains a `browser-tests-<browser>` artifact for 14 days on
 success or failure, containing the report directory and runner output. Generated
