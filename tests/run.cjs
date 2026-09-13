@@ -81,8 +81,20 @@ async function main() {
         diagnostics.stage(`${name}: diagnostic failure regressions`);
         const diagnosticChecks = await require("./diagnostics-regression.cjs")(instance, output, name);
         const browser = diagnostics.browser(instance, name);
-        diagnostics.stage(`${name}: fixture and numerical regressions`);
+        diagnostics.stage(`${name}: WebGL 2 capability`);
         const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
+        const graphics = await page.evaluate(() => {
+          const gl = document.createElement("canvas").getContext("webgl2");
+          if (!gl) return null;
+          const debug = gl.getExtension("WEBGL_debug_renderer_info");
+          return { vendor: gl.getParameter(debug ? debug.UNMASKED_VENDOR_WEBGL : gl.VENDOR),
+            renderer: gl.getParameter(debug ? debug.UNMASKED_RENDERER_WEBGL : gl.RENDERER),
+            version: gl.getParameter(gl.VERSION), shadingLanguage: gl.getParameter(gl.SHADING_LANGUAGE_VERSION) };
+        });
+        Object.assign(diagnostics.run.browsers.at(-1), { headless: process.env.HEADLESS !== "0", graphics });
+        diagnostics.save();
+        assert(graphics, `${name}: WebGL 2 unavailable; inspect the per-page diagnostics and runner graphics setup`);
+        diagnostics.stage(`${name}: fixture and numerical regressions`);
         const errors = [];
         page.on("pageerror", error => errors.push(error.message));
         page.on("console", message => { if (message.type() === "error") errors.push(message.text()); });

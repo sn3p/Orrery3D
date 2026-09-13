@@ -85,7 +85,8 @@ Tests build the real app and exercise loading, playback, discoveries, colours, c
 
 Each invocation replaces `.context/tests/report/` with fresh results and screenshots.
 `run.json` records the current stage, outcome and failure stack, including build or
-browser-launch failures; `results.json` retains completed browser results. Per-page
+browser-launch failures, browser versions and the WebGL renderer; `results.json`
+retains completed browser results. Per-page
 JSONL logs include console messages, page errors and failed requests. Helper pages
 are captured before cleanup, and still-open pages are captured on failure. The
 suite deliberately exercises loading errors and diagnostics failures, so recorded
@@ -99,6 +100,8 @@ installs locked dependencies with the Node.js version in `.nvmrc`, builds a clea
 `dist/` from source, and runs the full browser suite in separate Chrome, Firefox
 and WebKit jobs. Deployment requires the build and all three browser checks to
 pass. Pull requests targeting `master` run the same checks without deploying.
+Linux Firefox runs with a virtual display because its headless mode does not
+provide the WebGL 2 context required by this suite.
 
 Each browser job retains a `browser-tests-<browser>` artifact for 14 days on
 success or failure, containing the report directory and runner output. Generated

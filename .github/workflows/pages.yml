@@ -27,10 +27,13 @@ jobs:
         include:
           - browser: chromium
             install: chrome
+            headless: "1"
           - browser: firefox
             install: firefox
+            headless: "0"
           - browser: webkit
             install: webkit
+            headless: "1"
     steps:
       - name: Check out source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -52,10 +55,12 @@ jobs:
       - name: Run browser regressions
         env:
           BROWSERS: ${{ matrix.browser }}
+          # Firefox needs an X display for WebGL 2 on the Linux runner.
+          HEADLESS: ${{ matrix.headless }}
         run: |
           mkdir -p .context/test-logs
           set -o pipefail
-          npm test 2>&1 | tee .context/test-logs/runner.log
+          xvfb-run -a npm test 2>&1 | tee .context/test-logs/runner.log
 
       - name: Retain test results and diagnostics
         if: ${{ !cancelled() }}
