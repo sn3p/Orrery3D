@@ -25,6 +25,7 @@ module.exports = async (browser, url, output, name) => {
   const speed = page.getByRole("textbox", { name: "Playback speed" });
   const boot = async () => {
     await page.waitForFunction(() => Number(document.querySelector("#orrery-count").textContent) > 0);
+    await require("./options.cjs").openOptions(page);
     await speed.fill("0"); await speed.press("Enter"); await settle(page);
     await page.evaluate(() => {
       window.optionDraws = 0;
@@ -159,6 +160,7 @@ module.exports = async (browser, url, output, name) => {
     await standard.addInitScript(key => localStorage.setItem(key, "2"), key);
     await standard.goto(url);
     await standard.waitForFunction(() => Number(document.querySelector("#orrery-count").textContent) > 0);
+    await require("./options.cjs").openOptions(standard);
     assert(await standard.locator("select[aria-label='Rendering pixel ratio']").isHidden());
     await checkBuffer(standard, 1);
     await standard.screenshot({ path: path.join(output, `${name}-dpr-standard.png`) });

@@ -19,6 +19,7 @@ exports.testPausedRendering = async page => {
     };
     app.updateAsteroids = () => { probe.updates++; return update(); };
   });
+  await require("./options.cjs").openOptions(page);
   const speed = page.getByRole("textbox", { name: "Playback speed" });
   const pause = async () => { await speed.fill("0"); await speed.press("Enter"); await settle(page); };
   const idle = async () => {
@@ -128,6 +129,7 @@ exports.testPausedLoading = async (page, url) => {
   await page.route("**/data/catalog.json", async route => { await response; await route.continue(); });
   try {
     await page.goto(url, { waitUntil: "domcontentloaded" });
+    await require("./options.cjs").openOptions(page);
     const speed = page.getByRole("textbox", { name: "Playback speed" });
     await speed.fill("0"); await speed.press("Enter");
     await settle(page);
@@ -174,6 +176,7 @@ exports.testProductionInteractions = async (browser, url, output, name) => {
     await require("./high-dpi.cjs").installDprProbe(page);
     await page.goto(url);
     await page.waitForFunction(() => Number(document.querySelector("#orrery-count").textContent) > 0);
+    await require("./options.cjs").openOptions(page);
     const speed = page.getByRole("textbox", { name: "Playback speed" });
     await speed.fill("0"); await speed.press("Enter");
     await settle(page);
@@ -221,6 +224,7 @@ exports.testProductionInteractions = async (browser, url, output, name) => {
     assert(await page.evaluate(draws => window.productionDraws > draws, beforeResize), "Retina resize automatically repaints before any camera interaction");
     assert.deepEqual(await canvas.evaluate(el => [el.width, el.height]), [780, 1688], "Retina resize updates drawing buffer");
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth), 390);
+    await require("./options.cjs").openOptions(page);
     const bounds = await speed.boundingBox();
     assert(bounds.x >= 0 && bounds.x + bounds.width <= 390);
     await page.screenshot({ path: path.join(output, `${name}-paused-production-resized.png`) });

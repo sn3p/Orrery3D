@@ -13,6 +13,7 @@ fs.rmSync(output, { recursive: true, force: true });
 const diagnostics = new Diagnostics(output);
 
 async function checkUiTypography(page) {
+  await require("./options.cjs").openOptions(page);
   await page.evaluate(() => document.fonts.ready);
   const sizes = await page.evaluate(() => {
     const fontSize = selector => getComputedStyle(document.querySelector(selector)).fontSize;
@@ -255,6 +256,7 @@ async function main() {
         result.phaseUploads = phaseUploads;
         result.shader = await page.evaluate(() => window.test.validateShader(window.test.app, window.test.catalog));
         diagnostics.stage(`${name}: controls, layout and context recovery`);
+        await require("./options.cjs").openOptions(page);
         const speed = page.getByRole("textbox", { name: "Playback speed" });
         await speed.fill("1.5"); await speed.press("Enter");
         assert.equal(await page.evaluate(() => window.test.app.jedDelta), 1.5);
@@ -270,6 +272,7 @@ async function main() {
         const zoomed = await page.locator("canvas").screenshot(); assert(!rotated.equals(zoomed), "Camera zoom");
         await page.setViewportSize({ width: 390, height: 844 });
         await page.waitForFunction(() => document.querySelector("canvas").clientWidth === 390);
+        await require("./options.cjs").openOptions(page);
         const box = await speed.boundingBox(); assert(box.x >= 0 && box.x + box.width <= 390);
         await checkUiTypography(page);
         await page.screenshot({ path: path.join(output, `${name}-narrow.png`) });
@@ -305,7 +308,7 @@ async function main() {
           replacement.setupAsteroids(catalog);
           if (replacement.jedDelta !== 0 || replacement.asteroidDiscoveryDuration !== 0 || replacement.asteroidColor.getHex() !== 0 || replacement.asteroidDiscoveryColor.getHex() !== 0) throw new Error("Zero constructor options");
           replacement.dispose();
-          if (document.querySelector("canvas, .dg.main")) throw new Error("Dispose left a canvas or controls");
+          if (document.querySelector("canvas, .dg.main, .orrery-options")) throw new Error("Dispose left a canvas or controls");
         });
         result.manualRendering = await require("./rendering.cjs").testManualRendering(page);
         await page.reload(); await page.evaluate(() => window.testReady);
@@ -329,6 +332,7 @@ async function main() {
         await require("./rendering.cjs").testPausedLoading(page, url + "/production/");
         result.productionInteractions = await require("./rendering.cjs").testProductionInteractions(browser, url + "/production/", output, name);
         diagnostics.stage(`${name}: production DPR options`);
+        result.optionsPanel = await require("./options.cjs").testOptions(browser, url + "/production/", output, name);
         result.pixelRatioOptions = await require("./pixel-ratio.cjs")(browser, url + "/production/", output, name);
         assert.deepEqual(errors, []);
         result.catalogueLoading = await require("./catalogue-preparation.cjs").testLoading(browser, url + "/production/");
@@ -357,7 +361,7 @@ async function main() {
         });
         await page.reload(); await page.getByRole("alert").waitFor();
         assert.match(await page.getByRole("alert").textContent(), /WebGL 2 is required/);
-        assert.equal(await page.locator(".dg.main").count(), 0, "No controls for an unavailable renderer");
+        assert.equal(await page.locator(".dg.main, .orrery-options").count(), 0, "No controls for an unavailable renderer");
         diagnostics.stage(`${name}: benchmark workflow`);
         result.benchmark = await require("./benchmark.cjs")(browser, output, name);
         report.push({ browser: name, version: browser.version(), diagnosticChecks, cataloguePreparation, transferredCloud, ...result, contextRecovery: lossSupported, checks: "passed" });

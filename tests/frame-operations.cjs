@@ -137,6 +137,6 @@ exports.testGuiDisposal = async page => page.evaluate(() => {
   let draws = 0;
   app.renderer.render = () => { draws++; };
   app.renderFrame(); app.render();
-  check(draws === 0 && !document.querySelector("canvas, .dg.main"), "Disposed app cannot draw or leave controls");
+  check(draws === 0 && !document.querySelector("canvas, .dg.main, .orrery-options"), "Disposed app cannot draw or leave controls");
   return { directDisposals: destroys, appDisposals: disposals, drawsAfterDispose: draws };
 });

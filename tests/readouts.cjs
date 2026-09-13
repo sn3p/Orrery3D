@@ -63,6 +63,7 @@ exports.testProductionReadouts = async page => {
   await page.route("**/data/catalog.json", fulfillCatalogue);
   try {
     await page.reload({ waitUntil: "domcontentloaded" });
+    await require("./options.cjs").openOptions(page);
     const speed = page.getByRole("textbox", { name: "Playback speed" });
     await speed.fill("0"); await speed.press("Enter");
     await page.evaluate(() => new Promise(requestAnimationFrame));

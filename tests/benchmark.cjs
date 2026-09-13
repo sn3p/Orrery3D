@@ -14,6 +14,7 @@ module.exports = async function testBenchmark(browser, output, name) {
     await page.goto(url); await page.evaluate(() => window.benchmark.ready);
     assert.equal(await page.evaluate(() => document.querySelector("canvas").width), 1600,
       "Benchmark preview ignores the app's saved DPR choice");
+    assert(await page.locator(".orrery-options").isHidden(), "Benchmark hides the options trigger and panel");
     const highDpi = await require("./high-dpi.cjs").testBenchmarkDpr(page, name);
     const frames = await page.evaluate(() => window.benchmarkProbe.verify());
     assert.deepEqual(frames.steps, [1.5, 0, -1.5]);
