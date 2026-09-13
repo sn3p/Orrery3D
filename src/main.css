@@ -97,7 +97,7 @@ dat.GUI overrides
 }
 
 .orrery-options-panel {
-  width: 260px;
+  width: 300px;
   max-width: calc(100vw - 10px);
   max-height: calc(100dvh - 36px);
   overflow-y: auto;
@@ -146,7 +146,7 @@ dat.GUI overrides
 }
 
 .dg .property-name {
-  color: #999 !important;
+  color: #bbb !important;
   width: 20% !important;
 }
 

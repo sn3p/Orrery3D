@@ -16,6 +16,27 @@ exports.testOptions = async (browser, url, output, name) => {
   const panel = page.locator(".orrery-options-panel");
   const speed = page.getByRole("textbox", { name: "Playback speed" });
   const dpr = page.getByRole("combobox", { name: "Rendering pixel ratio" });
+  const checkSpacing = async () => {
+    const spacing = await panel.evaluate(el => {
+      const label = document.createRange();
+      label.selectNodeContents(el.querySelector(".property-name"));
+      const hint = el.querySelector("select").getAttribute("aria-describedby");
+      const text = document.getElementById(hint).firstChild;
+      const range = document.createRange();
+      range.selectNodeContents(text);
+      const lines = [...range.getClientRects()];
+      range.setStart(text, text.textContent.lastIndexOf("processing"));
+      return {
+        gap: el.querySelector(".slider").getBoundingClientRect().left - label.getBoundingClientRect().right,
+        lines: lines.length,
+        secondLineTop: lines[1]?.top,
+        lastWordTop: range.getBoundingClientRect().top,
+      };
+    });
+    assert(spacing.gap >= 8, "Speed label keeps at least 8px of visible space before the slider");
+    assert.equal(spacing.lines, 2, "DPR help fits on two lines");
+    assert(Math.abs(spacing.lastWordTop - spacing.secondLineTop) < 1, "Processing fits on the second line");
+  };
   try {
     await page.goto(url);
     await page.waitForFunction(() => Number(document.querySelector("#orrery-count").textContent) > 0);
@@ -74,11 +95,13 @@ exports.testOptions = async (browser, url, output, name) => {
     }).reduce((sum, channel, i) => sum + channel * [0.2126, 0.7152, 0.0722][i], 0);
     for (const hint of styles.hints) {
       const help = luminance(hint.help), background = luminance(styles.background);
-      assert(luminance(hint.label) > help, "Labels are brighter than help text");
+      assert((luminance(hint.label) + 0.05) / (help + 0.05) >= 1.5,
+        "Labels remain visibly brighter than help text");
       const contrast = (Math.max(help, background) + 0.05) / (Math.min(help, background) + 0.05);
       assert(contrast >= 4.5, `Help text contrast is at least 4.5:1 (actual ${contrast.toFixed(2)}:1)`);
     }
     assert(styles.select, "DPR select has a visible border on every side");
+    await checkSpacing();
     await speed.fill("0"); await speed.press("Enter");
     await dpr.selectOption("2");
     await dpr.selectOption("1");
@@ -131,6 +154,7 @@ exports.testOptions = async (browser, url, output, name) => {
         assert(box.x >= bounds.x && box.x + box.width <= bounds.x + bounds.width);
       }
       assert.equal(await panel.evaluate(el => el.scrollWidth <= el.clientWidth), true, "Panel has no horizontal overflow");
+      await checkSpacing();
       await page.screenshot({ path: path.join(output, `${name}-options-${viewport.width}x${viewport.height}.png`) });
     }
     await speed.fill("-1.5"); await speed.press("Enter");
