@@ -106,6 +106,8 @@ Linux CI uses Mesa software GL (Chrome selects ANGLE's OpenGL backend). SwiftSha
 trigonometric approximations exceed the existing orbital-error bound; the suite
 keeps the same shader and accuracy thresholds on the selected CI backend. Reports
 retain browser-reported WebGL information, which some browsers privacy-mask.
+Chrome uses CPU compositing in Linux CI to keep screenshot capture separate from
+ANGLE; WebGL rendering still uses Mesa.
 Local runs use the browser defaults, so CI does not establish accuracy on every
 graphics driver.
 
