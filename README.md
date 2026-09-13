@@ -21,28 +21,7 @@ nvm install
 nvm use
 ```
 
-In Conductor, **Setup** runs `npm ci` to install the locked dependencies. The checked-in catalogue is ready to use.
-
-**Run App** starts the default app script. To choose another script, open the **Run** terminal tab and click the small **⌄** beside the Run button in its toolbar. Conductor documents this picker in its [multiple run scripts guide](https://www.conductor.build/changelog/0.70.0-multiple-run-scripts).
-
-The configured scripts are:
-
-| Entry | Starts | Port |
-| --- | --- | --- |
-| **app** (default) | The 3D app with automatic rebuilds | `CONDUCTOR_PORT` |
-| **benchmark** | The production GPU benchmark; select an asteroid count and **Run benchmark** | `CONDUCTOR_PORT + 1` |
-
-Open the localhost URL printed in the run terminal. Each workspace gets its own ports, so both servers can run alongside other workspaces. **The app uses GPU asteroid orbits by default**, with no renderer setting or CPU fallback. Restart the benchmark server after changing benchmark code, and stop other rendering workloads before taking measurements.
-
-If the script picker is unavailable, start the benchmark from a new Conductor terminal in this workspace:
-
-```bash
-PORT=$((${CONDUCTOR_PORT:-3000} + 1)) npm run benchmark:serve
-```
-
-Open the printed **Benchmark** URL and select **Run benchmark**. This command can run alongside the app.
-
-Shared defaults are in [`.conductor/settings.toml`](.conductor/settings.toml). Conductor's Mac app picks up shared settings after they reach the default branch; a repository-local `.conductor/settings.local.toml` in the main checkout can apply the same commands immediately. Outside Conductor, the commands below start the app on port 3000, and `npm run benchmark:serve` starts the benchmark on port 3001.
+The checked-in catalogue is ready to use. The commands below start the app on port 3000, and `npm run benchmark:serve` starts the benchmark on port 3001. See the [benchmark instructions](benchmarks/README.md) for details.
 
 Install dependencies:
 
