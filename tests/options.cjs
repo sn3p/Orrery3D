@@ -43,7 +43,8 @@ exports.testOptions = async (browser, url, output, name) => {
           && style[`border${side}Color`] !== style.backgroundColor);
       })(),
     }));
-    for (const hint of styles.hints) assert.equal(hint.help, hint.label, "Help text matches its label's muted color");
+    const brightness = color => color.match(/\d+/g).slice(0, 3).reduce((sum, channel) => sum + Number(channel), 0);
+    for (const hint of styles.hints) assert(brightness(hint.label) > brightness(hint.help), "Labels are brighter than help text");
     assert(styles.select, "DPR select has a visible border on every side");
     await speed.fill("0"); await speed.press("Enter");
     await dpr.selectOption("1");
