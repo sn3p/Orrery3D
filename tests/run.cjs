@@ -80,6 +80,9 @@ async function main() {
         const fps = await require("./frame-operations.cjs").testFps(page);
         const saturn = await require("./planets.cjs")(page);
         const orbitTracks = await require("./orbit-tracks.cjs")(page);
+        const cpuOrbits = await require("./cpu-orbits.cjs").testNumerics(page);
+        const cpuScene = await require("./cpu-orbits.cjs").testScene(page);
+        const invalidCpuOrbits = await require("./cpu-orbits.cjs").testInvalidInputs(page);
         const cataloguePreparation = await require("./catalogue-preparation.cjs").testReplacement(page);
         const transferredCloud = await require("./catalogue-preparation.cjs").testTransferredCloud(page);
         const catalogueReplacement = name === "chromium"
@@ -202,6 +205,9 @@ async function main() {
         result.pausedRendering = pausedRendering;
         result.saturn = saturn;
         result.orbitTracks = orbitTracks;
+        result.cpuOrbits = cpuOrbits;
+        result.cpuScene = cpuScene;
+        result.invalidCpuOrbits = invalidCpuOrbits;
         result.readoutBoundaries = readoutBoundaries;
         result.pausedLifecycle = pausedLifecycle;
         result.catalogueReplacement = catalogueReplacement;
@@ -262,6 +268,7 @@ async function main() {
         await page.waitForFunction(() => window.test.app.asteroidsDiscovered > 0);
         result.saturnAfterReload = await require("./planets.cjs")(page);
         result.orbitTracksAfterReload = await require("./orbit-tracks.cjs")(page);
+        result.cpuSceneAfterReload = await require("./cpu-orbits.cjs").testScene(page);
         assert.deepEqual(errors, []);
         if (name === "chromium") result.catalogueMemory = await require("./catalogue-memory.cjs")(browser, url + "/production/");
         // Actual production build, without a test API.
