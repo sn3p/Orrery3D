@@ -31,6 +31,20 @@ exports.testOptions = async (browser, url, output, name) => {
     assert(await speed.evaluate(el => el === document.activeElement), "Opening moves focus to the first control");
     assert.match(await page.locator("#" + await speed.getAttribute("aria-describedby")).textContent(), /0 pauses/);
     assert.match(await page.locator("#" + await dpr.getAttribute("aria-describedby")).textContent(), /Lower DPR/);
+    const styles = await panel.evaluate(el => ({
+      hints: [...el.querySelectorAll(".orrery-options-hint")].map(hint => ({
+        help: getComputedStyle(hint).color,
+        label: getComputedStyle(hint.closest("li").querySelector(".property-name")).color,
+      })),
+      select: (() => {
+        const style = getComputedStyle(el.querySelector("select"));
+        return ["Top", "Right", "Bottom", "Left"].every(side =>
+          parseFloat(style[`border${side}Width`]) > 0 && style[`border${side}Style`] !== "none"
+          && style[`border${side}Color`] !== style.backgroundColor);
+      })(),
+    }));
+    for (const hint of styles.hints) assert.equal(hint.help, hint.label, "Help text matches its label's muted color");
+    assert(styles.select, "DPR select has a visible border on every side");
     await speed.fill("0"); await speed.press("Enter");
     await dpr.selectOption("1");
     await page.waitForFunction(() => document.querySelector("#orrery-fps").textContent === "0 FPS");

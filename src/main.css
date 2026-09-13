@@ -112,7 +112,7 @@ dat.GUI overrides
 .orrery-options-hint {
   clear: both;
   margin: 0 0 8px;
-  color: #888;
+  color: #666;
   font-size: 11px;
   line-height: 16px;
 }
@@ -179,7 +179,7 @@ dat.GUI overrides
   color: #999;
   background: #151515;
   color-scheme: dark;
-  border: 0;
+  border: 1px solid #666;
   border-radius: 0;
   height: 19px;
   margin: 4px 0;
