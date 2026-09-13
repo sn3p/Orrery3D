@@ -49,11 +49,11 @@ export default class Gui {
     input.title = "0 pauses; negative reverses. 1 = 60 days per second.";
     this.addHint(speed, "0 pauses; negative reverses.", input);
 
-    this.pixelRatio = this.gui.add(this.orrery, "pixelRatio", { Auto: "auto" }).name("DPR");
+    this.pixelRatio = this.gui.add(this.orrery, "pixelRatio", { "1×": "1", "2×": "2" }).name("DPR");
     this.pixelRatioSelect = this.pixelRatio.domElement.querySelector("select");
     this.pixelRatioSelect.setAttribute("aria-label", "Rendering pixel ratio");
-    this.pixelRatioSelect.title = "Auto uses your display's resolution. Lower values reduce sharpness and graphics work.";
-    this.addHint(this.pixelRatio, "Auto matches your display. Lower DPR reduces detail and graphics work.", this.pixelRatioSelect);
+    this.pixelRatioSelect.title = "Starts at 1×. 2× adds detail and graphics work.";
+    this.addHint(this.pixelRatio, this.pixelRatioSelect.title, this.pixelRatioSelect);
     this.updatePixelRatio();
     this.trigger.addEventListener("click", this.onToggle);
     document.addEventListener("pointerdown", this.onOutsidePointer, true);
@@ -92,20 +92,10 @@ export default class Gui {
   };
 
   updatePixelRatio() {
-    const native = window.devicePixelRatio;
-    const current = this.orrery.pixelRatio;
-    const format = value => `${Number(value.toFixed(2))}×`;
-    const options = [new Option(`Auto (${format(native)})`, "auto")];
-    for (const ratio of [1, 2, 3]) {
-      if (ratio <= native || String(ratio) === current) {
-        const label = ratio <= native ? format(ratio) : `${format(ratio)} (${format(native)} now)`;
-        options.push(new Option(label, String(ratio)));
-      }
-    }
-    this.pixelRatioSelect.replaceChildren(...options);
-    this.pixelRatioSelect.value = current;
-    this.pixelRatio.domElement.closest("li").style.display = native > 1 ? "" : "none";
-    if (native <= 1 && document.activeElement === this.pixelRatioSelect) {
+    const available = window.devicePixelRatio >= 2;
+    this.pixelRatioSelect.value = this.orrery.pixelRatio;
+    this.pixelRatio.domElement.closest("li").style.display = available ? "" : "none";
+    if (!available && document.activeElement === this.pixelRatioSelect) {
       this.gui.domElement.querySelector("input").focus();
     }
   }

@@ -56,36 +56,28 @@ module.exports = async (browser, url, output, name) => {
     await page.goto(url); await boot();
     assert.equal(await control.count(), 1, "High-DPI display exposes the DPR control");
     assert.equal(await control.inputValue(), "1", "Fresh production boot defaults to 1×");
-    assert.deepEqual(await control.locator("option").evaluateAll(options => options.map(o => o.value)), ["auto", "1", "2", "3"]);
+    assert.deepEqual(await control.locator("option").evaluateAll(options => options.map(o => o.value)), ["1", "2"]);
     await checkBuffer(page, 1);
     assert.equal(await page.evaluate(key => localStorage.getItem(key), key), null, "Boot does not invent a saved preference");
     await page.screenshot({ path: path.join(output, `${name}-dpr-default-desktop.png`) });
     await page.reload(); await boot();
     assert.equal(await control.inputValue(), "1", "An unset preference stays at 1× after reload");
     await checkBuffer(page, 1);
-    await choose("auto");
-    await checkBuffer(page, 3);
-    await page.screenshot({ path: path.join(output, `${name}-dpr-auto-desktop.png`) });
-
-    for (const ratio of [1, 2, 3]) {
+    for (const ratio of [2, 1, 2]) {
       await choose(String(ratio)); await checkBuffer(page, ratio);
-      assert.equal(await page.evaluate(key => localStorage.getItem(key), key), String(ratio));
-      await page.reload(); await boot();
-      assert.equal(await control.inputValue(), String(ratio), "Reload preserves each manual choice");
-      await checkBuffer(page, ratio);
+      assert.equal(await page.evaluate(key => localStorage.getItem(key), key), null, "DPR choices are not saved");
     }
-    // Native select stays focused and operable with the keyboard.
-    await control.focus(); await control.press("a"); await control.press("Enter");
-    await settle(page);
-    assert.equal(await control.inputValue(), "auto");
-    assert(await control.evaluate(el => el === document.activeElement));
-    assert.equal(await page.evaluate(key => localStorage.getItem(key), key), "auto");
-    await checkBuffer(page, 3);
-
-    await choose("2");
     await page.reload(); await boot();
-    assert.equal(await control.inputValue(), "2", "Reload restores the choice through production boot");
+    assert.equal(await control.inputValue(), "1", "Reload starts at 1× after choosing 2×");
+    await checkBuffer(page, 1);
+    // Native select stays focused and operable with the keyboard.
+    await control.focus(); await control.press("2"); await control.press("Enter");
+    await settle(page);
+    assert.equal(await control.inputValue(), "2");
+    assert(await control.evaluate(el => el === document.activeElement));
     await checkBuffer(page, 2);
+    await idle();
+    await page.screenshot({ path: path.join(output, `${name}-dpr-2x-desktop.png`) });
     await page.setViewportSize({ width: 390, height: 844 }); await idle();
     await checkBuffer(page, 2);
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth), 390);
@@ -95,21 +87,22 @@ module.exports = async (browser, url, output, name) => {
     }
     await page.screenshot({ path: path.join(output, `${name}-dpr-manual-narrow.png`) });
 
-    // A saved choice survives a move to a lower-resolution display and back.
+    // The current page's choice resumes when 2× becomes available again.
     if (name === "chromium") {
       cdp = await page.context().newCDPSession(page);
       await control.focus();
-      for (const native of [1.5, 1, 3]) {
+      for (const native of [2.5, 1.5, 0.75, 1, 2, 3]) {
         await cdp.send("Emulation.setDeviceMetricsOverride", { ...page.viewportSize(), deviceScaleFactor: native, mobile: false });
         await deliverDprChanges(page); await idle();
-        await checkBuffer(page, Math.min(2, native));
-        assert.equal(await page.evaluate(key => localStorage.getItem(key), key), "2");
-        assert.equal(await page.locator("select[aria-label='Rendering pixel ratio']").isVisible(), native > 1);
-        if (native === 1) assert(await speed.evaluate(el => el === document.activeElement),
+        await checkBuffer(page, native >= 2 ? 2 : Math.min(1, native));
+        assert.equal(await page.locator("select[aria-label='Rendering pixel ratio']").inputValue(), "2");
+        assert.equal(await page.locator("select[aria-label='Rendering pixel ratio']").isVisible(), native >= 2);
+        if (native < 2) assert(await speed.evaluate(el => el === document.activeElement),
           "Focus moves to the speed control when the DPR control becomes unavailable");
         if (native === 1.5) {
-          assert.equal(await control.locator("option:checked").textContent(), "2× (1.5× now)");
-          await page.screenshot({ path: path.join(output, `${name}-dpr-clamped.png`) });
+          await page.screenshot({ path: path.join(output, `${name}-dpr-unavailable.png`) });
+        } else if (native >= 2) {
+          assert.deepEqual(await control.locator("option").allTextContents(), ["1×", "2×"]);
         }
       }
     }
@@ -148,34 +141,41 @@ module.exports = async (browser, url, output, name) => {
         : document.querySelector("#orrery-date").textContent < date, { date, forward: Number(speedValue) > 0 });
       await speed.fill("0"); await speed.press("Enter"); await idle();
     }
-    await choose("auto"); await page.reload(); await boot();
-    await checkBuffer(page, 3);
-    assert.equal(await control.inputValue(), "auto");
-    // Invalid stored input and unavailable storage do not break boot or control changes.
-    await page.evaluate(key => localStorage.setItem(key, "not-a-ratio"), key);
-    await page.reload(); await boot(); await checkBuffer(page, 1);
-    assert.equal(await control.inputValue(), "1");
+    // Every legacy saved choice is ignored: each boot starts at 1×.
+    for (const value of ["auto", "1", "2", "3", "not-a-ratio"]) {
+      await page.evaluate(({ key, value }) => localStorage.setItem(key, value), { key, value });
+      await page.reload(); await boot(); await checkBuffer(page, 1);
+      assert.equal(await control.inputValue(), "1", `Legacy ${value} cannot override the default`);
+      await choose("2"); await checkBuffer(page, 2);
+      assert.equal(await page.evaluate(key => localStorage.getItem(key), key), value, "Controls do not write preferences");
+    }
+    // Unavailable storage does not break boot or control changes.
     await page.addInitScript(() => {
       Object.defineProperty(window, "localStorage", { get() { throw new DOMException("Storage blocked", "SecurityError"); } });
     });
     await page.reload(); await boot(); await checkBuffer(page, 1);
-    await choose("auto"); await checkBuffer(page, 3);
+    await choose("2"); await checkBuffer(page, 2);
     await page.reload(); await boot(); await checkBuffer(page, 1);
     assert.deepEqual(errors, []);
   } finally {
     if (cdp) await cdp.detach();
     await page.close();
   }
-  const standard = await browser.newPage({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 1 });
-  try {
-    await standard.addInitScript(key => localStorage.setItem(key, "2"), key);
-    await standard.goto(url);
-    await standard.waitForFunction(() => Number(document.querySelector("#orrery-count").textContent) > 0);
-    await require("./options.cjs").openOptions(standard);
-    assert(await standard.locator("select[aria-label='Rendering pixel ratio']").isHidden());
-    await checkBuffer(standard, 1);
-    await standard.screenshot({ path: path.join(output, `${name}-dpr-standard.png`) });
-  } finally { await standard.close(); }
-  return { freshDefaultAndReload: "1×", choicesAndKeyboard: "passed", persistenceAndStorageErrors: "passed", lifecycle: "passed",
+  for (const native of [0.75, 1, 1.5, 2, 2.5]) {
+    const standard = await browser.newPage({ viewport: { width: 390, height: 844 }, deviceScaleFactor: native });
+    try {
+      await standard.addInitScript(key => localStorage.setItem(key, "2"), key);
+      await standard.goto(url);
+      await standard.waitForFunction(() => Number(document.querySelector("#orrery-count").textContent) > 0);
+      await require("./options.cjs").openOptions(standard);
+      const select = standard.locator("select[aria-label='Rendering pixel ratio']");
+      assert.equal(await select.isVisible(), native >= 2, "2× availability controls visibility, including fractional displays");
+      assert.equal(await select.inputValue(), "1");
+      assert.deepEqual(await select.locator("option").allTextContents(), ["1×", "2×"]);
+      await checkBuffer(standard, Math.min(1, native));
+      await standard.screenshot({ path: path.join(output, `${name}-dpr-native-${native}.png`) });
+    } finally { await standard.close(); }
+  }
+  return { freshDefaultAndReload: "always 1×", choicesAndKeyboard: "1×/2×", legacyAndUnavailableStorage: "ignored", lifecycle: "passed",
     desktopAndNarrow: "passed", displayTransitions: name === "chromium" ? "CDP with delivered media events" : "not exercised" };
 };

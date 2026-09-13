@@ -9,8 +9,10 @@ const buffer = page => page.evaluate(() => {
     canvas: [canvas.width, canvas.height], drawingBuffer: [gl.drawingBufferWidth, gl.drawingBufferHeight] };
 });
 const checkBuffer = async (page, dpr, width, height) => {
+  // Production selected 2×: lower-resolution displays fall back to 1×.
+  const effective = dpr >= 2 ? 2 : Math.min(1, dpr);
   assert.deepEqual(await buffer(page), { nativeDpr: dpr, viewport: [width, height],
-    canvas: [width * dpr, height * dpr], drawingBuffer: [width * dpr, height * dpr] });
+    canvas: [width * effective, height * effective], drawingBuffer: [width * effective, height * effective] });
 };
 
 // CDP changes DPR and query.matches, but Chrome does not dispatch the native

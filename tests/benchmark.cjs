@@ -13,7 +13,7 @@ module.exports = async function testBenchmark(browser, output, name) {
     await page.addInitScript(() => localStorage.setItem("orrery3d.pixelRatio", "1"));
     await page.goto(url); await page.evaluate(() => window.benchmark.ready);
     assert.equal(await page.evaluate(() => document.querySelector("canvas").width), 1600,
-      "Benchmark preview ignores the app's saved DPR choice");
+      "Benchmark preview uses native DPR independently of the app's 1× default and legacy preferences");
     assert(await page.locator(".orrery-options").isHidden(), "Benchmark hides the options trigger and panel");
     const highDpi = await require("./high-dpi.cjs").testBenchmarkDpr(page, name);
     const frames = await page.evaluate(() => window.benchmarkProbe.verify());

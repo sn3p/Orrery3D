@@ -177,7 +177,7 @@ exports.testProductionInteractions = async (browser, url, output, name) => {
     await page.goto(url);
     await page.waitForFunction(() => Number(document.querySelector("#orrery-count").textContent) > 0);
     await require("./options.cjs").openOptions(page);
-    await page.getByRole("combobox", { name: "Rendering pixel ratio" }).selectOption("auto");
+    await page.getByRole("combobox", { name: "Rendering pixel ratio" }).selectOption("2");
     const speed = page.getByRole("textbox", { name: "Playback speed" });
     await speed.fill("0"); await speed.press("Enter");
     await settle(page);

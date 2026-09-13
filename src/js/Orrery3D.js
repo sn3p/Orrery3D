@@ -10,20 +10,12 @@ import Asteroids from "./Asteroids";
 import { prepareCatalogue } from "./prepareCatalogue";
 import PlaybackClock from "./PlaybackClock";
 
-const pixelRatioKey = "orrery3d.pixelRatio";
-const pixelRatioChoice = value => ["auto", "1", "2", "3"].includes(value) ? value : "1";
-
 export default class Orrery3D {
   constructor(options = {}) {
     this.container = options.container || document.body;
     this.startDate = options.startDate || new Date(1980, 1);
     this._jedDelta = options.jedDelta ?? 1.5;
-    this.rememberPixelRatio = options.rememberPixelRatio ?? true;
     this._pixelRatio = "1";
-    if (this.rememberPixelRatio) {
-      try { this._pixelRatio = pixelRatioChoice(localStorage.getItem(pixelRatioKey)); }
-      catch { /* Storage may be unavailable; keep the 1× default. */ }
-    }
     this.asteroidColor = new THREE.Color(options.asteroidColor ?? 0x999999);
     this.asteroidDiscoveryColor = new THREE.Color(options.asteroidDiscoveryColor ?? 0x00ff00);
     this.asteroidDiscoveryDuration = options.asteroidDiscoveryDuration ?? 200; // in Julian days
@@ -76,20 +68,14 @@ export default class Orrery3D {
   get pixelRatio() { return this._pixelRatio; }
 
   set pixelRatio(value) {
-    const ratio = pixelRatioChoice(value);
+    const ratio = value === "2" ? "2" : "1";
     if (ratio === this._pixelRatio || this.disposed) return;
     this._pixelRatio = ratio;
-    if (this.rememberPixelRatio) {
-      try {
-        localStorage.setItem(pixelRatioKey, ratio);
-      } catch { /* The choice still works for this session when storage is blocked. */ }
-    }
     this.resize();
   }
 
   get effectivePixelRatio() {
-    return this.pixelRatio === "auto" ? window.devicePixelRatio
-      : Math.min(Number(this.pixelRatio), window.devicePixelRatio);
+    return window.devicePixelRatio >= 2 ? Number(this.pixelRatio) : Math.min(1, window.devicePixelRatio);
   }
 
   createSystem() {

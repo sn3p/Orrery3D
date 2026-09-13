@@ -51,7 +51,9 @@ exports.testOptions = async (browser, url, output, name) => {
       "Marker and word have a compact positive gap");
     assert(await speed.evaluate(el => el === document.activeElement), "Opening moves focus to the first control");
     assert.match(await page.locator("#" + await speed.getAttribute("aria-describedby")).textContent(), /0 pauses/);
-    assert.match(await page.locator("#" + await dpr.getAttribute("aria-describedby")).textContent(), /Lower DPR/);
+    const dprHelp = await page.locator("#" + await dpr.getAttribute("aria-describedby")).textContent();
+    assert.equal(dprHelp, "Starts at 1×. 2× adds detail and graphics work.");
+    assert.equal(await dpr.getAttribute("title"), dprHelp);
     const styles = await panel.evaluate(el => ({
       hints: [...el.querySelectorAll(".orrery-options-hint")].map(hint => ({
         help: getComputedStyle(hint).color,
@@ -132,7 +134,7 @@ exports.testOptions = async (browser, url, output, name) => {
     assert(await panel.isHidden(), "Reload starts with a closed panel");
     assert.equal(await trigger.textContent(), "[+] options");
     await exports.openOptions(page);
-    assert.equal(await dpr.inputValue(), "1", "Panel visibility does not change persisted DPR");
+    assert.equal(await dpr.inputValue(), "1", "Reload starts at the 1× default");
     assert.deepEqual(errors, []);
     return { toggleAndDismissal: "passed", keyboardAndFocus: "passed", valuesAndIdle: "passed",
       desktopNarrowAndShort: "passed", reload: "passed" };
