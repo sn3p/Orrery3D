@@ -1,5 +1,6 @@
 const assert = require("node:assert/strict");
 const path = require("node:path");
+const { expect } = require("playwright/test");
 
 exports.openOptions = async page => {
   const trigger = page.getByRole("button", { name: "Options", exact: true });
@@ -50,11 +51,12 @@ exports.testOptions = async (browser, url, output, name) => {
     assert(toggleStyle.gap > 0 && toggleStyle.gap < toggleStyle.textSize * 0.4,
       "Marker and word have a compact positive gap");
     assert(await speed.evaluate(el => el === document.activeElement), "Opening moves focus to the first control");
-    assert.match(await page.locator("#" + await speed.getAttribute("aria-describedby")).textContent(), /0 pauses/);
+    await expect(speed).toHaveAccessibleDescription("0 pauses; negative reverses. 1 = 60 days per second.");
     const dprHelp = await page.locator("#" + await dpr.getAttribute("aria-describedby")).textContent();
     assert.equal(dprHelp, "Starts at 1×. 2× adds detail and graphics work.");
     assert.equal(await dpr.getAttribute("title"), dprHelp);
     const styles = await panel.evaluate(el => ({
+      background: getComputedStyle(el).backgroundColor,
       hints: [...el.querySelectorAll(".orrery-options-hint")].map(hint => ({
         help: getComputedStyle(hint).color,
         label: getComputedStyle(hint.closest("li").querySelector(".property-name")).color,
@@ -66,8 +68,16 @@ exports.testOptions = async (browser, url, output, name) => {
           && style[`border${side}Color`] !== style.backgroundColor);
       })(),
     }));
-    const brightness = color => color.match(/\d+/g).slice(0, 3).reduce((sum, channel) => sum + Number(channel), 0);
-    for (const hint of styles.hints) assert(brightness(hint.label) > brightness(hint.help), "Labels are brighter than help text");
+    const luminance = color => color.match(/\d+/g).slice(0, 3).map(Number).map(channel => {
+      const srgb = channel / 255;
+      return srgb <= 0.04045 ? srgb / 12.92 : ((srgb + 0.055) / 1.055) ** 2.4;
+    }).reduce((sum, channel, i) => sum + channel * [0.2126, 0.7152, 0.0722][i], 0);
+    for (const hint of styles.hints) {
+      const help = luminance(hint.help), background = luminance(styles.background);
+      assert(luminance(hint.label) > help, "Labels are brighter than help text");
+      const contrast = (Math.max(help, background) + 0.05) / (Math.min(help, background) + 0.05);
+      assert(contrast >= 4.5, `Help text contrast is at least 4.5:1 (actual ${contrast.toFixed(2)}:1)`);
+    }
     assert(styles.select, "DPR select has a visible border on every side");
     await speed.fill("0"); await speed.press("Enter");
     await dpr.selectOption("2");

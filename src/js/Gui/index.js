@@ -47,7 +47,7 @@ export default class Gui {
     const input = speed.domElement.querySelector("input");
     input.setAttribute("aria-label", "Playback speed");
     input.title = "0 pauses; negative reverses. 1 = 60 days per second.";
-    this.addHint(speed, "0 pauses; negative reverses.", input);
+    this.addHint(speed, input.title, input);
 
     this.pixelRatio = this.gui.add(this.orrery, "pixelRatio", { "1×": "1", "2×": "2" }).name("DPR");
     this.pixelRatioSelect = this.pixelRatio.domElement.querySelector("select");
