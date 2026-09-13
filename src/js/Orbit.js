@@ -2,6 +2,7 @@ import { PIXELS_PER_AU, J2000, DEG_TO_RAD } from "./constants";
 import * as THREE from "three";
 
 const TAU = 2 * Math.PI;
+const ELEMENT_KEYS = ["a", "e", "i", "W", "wbar", "w", "M", "n", "P", "epoch"];
 
 function meanMotion(eph) {
   // Preserve the existing zero/absent-n period fallback.
@@ -50,10 +51,9 @@ function eccentricAnomaly(mean, e) {
 }
 
 export default class Orbit {
-  // Get position at time for Julian Date
-  static getPosAtTime(eph, jed) {
+  constructor(eph) {
     const { cos, sin } = Math;
-    if (!eph || !Number.isFinite(jed)) throw new RangeError("Invalid orbit or Julian date.");
+    if (!eph) throw new RangeError("Invalid orbit or Julian date.");
     const perihelion = eph.wbar ?? eph.w;
     if (!Number.isFinite(eph.a) || eph.a <= 0 || !Number.isFinite(eph.e) || eph.e < 0 || eph.e >= 1
       || !Number.isFinite(eph.i) || !Number.isFinite(eph.W) || !Number.isFinite(perihelion)
@@ -61,32 +61,66 @@ export default class Orbit {
       throw new RangeError("Invalid elliptical orbital elements.");
     }
     const longitude = eph.wbar ?? (perihelion + eph.W);
-    const epoch = eph.epoch;
     const e = eph.e;
     const a = eph.a * PIXELS_PER_AU;
     const i = eph.i * DEG_TO_RAD;
     const o = eph.W * DEG_TO_RAD; // longitude of ascending node
     const w = (longitude - eph.W) * DEG_TO_RAD; // argument of perihelion
-    const M = eph.M * DEG_TO_RAD + meanMotion(eph) * (jed - epoch);
-    if (!Number.isFinite(M) || !Number.isFinite(a) || !Number.isFinite(longitude)) {
+    const n = meanMotion(eph);
+    if (!Number.isFinite(a) || !Number.isFinite(longitude)) {
       throw new RangeError("Orbit exceeds numerical range.");
     }
-    const E = eccentricAnomaly(M, e);
+    // Keep a snapshot so a planet can detect edits to its public ephemeris.
+    this.elements = {};
+    for (const key of ELEMENT_KEYS) this.elements[key] = eph[key];
+    this.epoch = eph.epoch;
+    this.mean = eph.M * DEG_TO_RAD;
+    this.n = n;
+    this.e = e;
+    this.a = a;
+    this.b = a * Math.sqrt((1 - e) * (1 + e));
+    const co = cos(o), so = sin(o), cw = cos(w), sw = sin(w), ci = cos(i), si = sin(i);
+    this.px = co * cw - so * sw * ci;
+    this.py = so * cw + co * sw * ci;
+    this.pz = sw * si;
+    this.qx = -co * sw - so * cw * ci;
+    this.qy = -so * sw + co * cw * ci;
+    this.qz = cw * si;
+  }
+
+  matches(eph) {
+    if (!eph) return false;
+    for (const key of ELEMENT_KEYS) {
+      if (!Object.is(eph[key], this.elements[key])) return false;
+    }
+    return true;
+  }
+
+  // Pass an existing Vector3 for allocation-free updates; omitted targets
+  // preserve the array-returning API used by one-off calculations.
+  getPosAtTime(jed, target) {
+    if (!Number.isFinite(jed)) throw new RangeError("Invalid orbit or Julian date.");
+    const M = this.mean + this.n * (jed - this.epoch);
+    if (!Number.isFinite(M)) throw new RangeError("Orbit exceeds numerical range.");
+    const E = eccentricAnomaly(M, this.e);
 
     // Direct eccentric-anomaly coordinates avoid the near-parabolic 0/0
     // cancellation in r = a(1-e²)/(1+e cos(v)), especially at aphelion.
-    const px = a * (cos(E) - e);
-    const py = a * Math.sqrt((1 - e) * (1 + e)) * sin(E);
-    const x = px * (cos(o) * cos(w) - sin(o) * sin(w) * cos(i))
-      + py * (-cos(o) * sin(w) - sin(o) * cos(w) * cos(i));
-    const y = px * (sin(o) * cos(w) + cos(o) * sin(w) * cos(i))
-      + py * (-sin(o) * sin(w) + cos(o) * cos(w) * cos(i));
-    const z = px * sin(w) * sin(i) + py * cos(w) * sin(i);
+    const px = this.a * (Math.cos(E) - this.e);
+    const py = this.b * Math.sin(E);
+    const x = px * this.px + py * this.qx;
+    const y = px * this.py + py * this.qy;
+    const z = px * this.pz + py * this.qz;
     if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(z)) {
       throw new RangeError("Orbit exceeds numerical range.");
     }
 
-    return [x, y, z];
+    return target ? target.set(x, y, z) : [x, y, z];
+  }
+
+  // One-off callers always observe the supplied elements and own their result.
+  static getPosAtTime(eph, jed) {
+    return new Orbit(eph).getPosAtTime(jed);
   }
 
   static createOrbit(eph, jed = J2000) {
@@ -115,21 +149,17 @@ export default class Orbit {
   static getOrbitGeometry(eph, jed = J2000, baseResolution = 90) {
     // Validate before allocating a track, including nonfinite elements that
     // would otherwise turn the segment count into NaN and skip every sample.
-    const first = Orbit.getPosAtTime(eph, jed);
+    const orbit = new Orbit(eph);
+    const position = orbit.getPosAtTime(jed, new THREE.Vector3());
     const parts = Orbit.getOrbitResolution(eph, baseResolution);
     const period = Orbit.getPeriodInDays(eph);
     const delta = period / parts;
     const positions = new Float32Array((parts + 1) * 3);
-    positions.set(first);
+    position.toArray(positions);
 
     for (let i = 1; i < parts; ++i) {
       const j = jed + delta * i;
-      const [x, y, z] = Orbit.getPosAtTime(eph, j);
-
-      const offset = i * 3;
-      positions[offset] = x;
-      positions[offset + 1] = y;
-      positions[offset + 2] = z;
+      orbit.getPosAtTime(j, position).toArray(positions, i * 3);
     }
 
     // Repeat the first vertex exactly so the dashed line includes its closing segment.

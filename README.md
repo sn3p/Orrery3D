@@ -130,6 +130,8 @@ Larger catalogues increase download, parsing, preparation and memory costs even 
 
 Asteroid positions and discovery colours are calculated in a vertex shader within one point batch. Ordinary frames update time uniforms and the discovered draw range; they do not recalculate or upload every position in JavaScript. Planets and orbit lines still use the CPU orbital model.
 
+Each planet caches its fixed orbital basis and ellipse scale, updating its existing position vector each frame. Changes to its orbital elements rebuild that cache. Orbit tracks reuse the same prepared calculations across their samples. The Sun and planets share sphere construction while keeping separate geometry and material ownership.
+
 Playback follows elapsed time: speed `1` means 60 simulated days per second, `0` pauses, and negative speeds reverse. The default `1.5` preserves the old pace at 60 FPS. Hidden tabs and lost graphics contexts pause playback.
 
 At speed `0`, the scene renders only when the camera, date, catalogue or viewport changes, or graphics reconnect. The readout shows `0 FPS` while paused. Resuming playback excludes time spent paused or disconnected.
