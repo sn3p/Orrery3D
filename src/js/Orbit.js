@@ -54,12 +54,13 @@ export default class Orbit {
   static getPosAtTime(eph, jed) {
     const { cos, sin } = Math;
     if (!eph || !Number.isFinite(jed)) throw new RangeError("Invalid orbit or Julian date.");
-    const longitude = eph.wbar ?? (eph.w + eph.W);
+    const perihelion = eph.wbar ?? eph.w;
     if (!Number.isFinite(eph.a) || eph.a <= 0 || !Number.isFinite(eph.e) || eph.e < 0 || eph.e >= 1
-      || !Number.isFinite(eph.i) || !Number.isFinite(eph.W) || !Number.isFinite(longitude)
+      || !Number.isFinite(eph.i) || !Number.isFinite(eph.W) || !Number.isFinite(perihelion)
       || !Number.isFinite(eph.M) || !Number.isFinite(eph.epoch)) {
       throw new RangeError("Invalid elliptical orbital elements.");
     }
+    const longitude = eph.wbar ?? (perihelion + eph.W);
     const epoch = eph.epoch;
     const e = eph.e;
     const a = eph.a * PIXELS_PER_AU;
@@ -67,7 +68,9 @@ export default class Orbit {
     const o = eph.W * DEG_TO_RAD; // longitude of ascending node
     const w = (longitude - eph.W) * DEG_TO_RAD; // argument of perihelion
     const M = eph.M * DEG_TO_RAD + meanMotion(eph) * (jed - epoch);
-    if (!Number.isFinite(M) || !Number.isFinite(a)) throw new RangeError("Orbit exceeds numerical range.");
+    if (!Number.isFinite(M) || !Number.isFinite(a) || !Number.isFinite(longitude)) {
+      throw new RangeError("Orbit exceeds numerical range.");
+    }
     const E = eccentricAnomaly(M, e);
 
     // Direct eccentric-anomaly coordinates avoid the near-parabolic 0/0

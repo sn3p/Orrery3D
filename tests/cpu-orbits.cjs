@@ -56,6 +56,12 @@ exports.testNumerics = async page => {
       check({ ...base, wbar }, base.epoch, `longitude ${wbar}`, true);
     }
     check({ ...base, w: undefined }, base.epoch, "zero longitude without fallback fields", true);
+    for (const w of [null, false, true, "0", {}, []]) {
+      check({ ...base, w }, base.epoch, "explicit longitude ignores unused fallback", true);
+    }
+    for (const wbar of [null, undefined]) {
+      check({ ...base, wbar, w: 0 }, base.epoch, "valid zero argument of perihelion", true);
+    }
     check({ ...base, e: 0.999, M: 0.013823007675795088 / rad }, base.epoch,
       "historical divergent Newton case", true);
     for (const e of [0, 0.0167, 0.8, 0.95, 0.999, 0.999999, 1 - Number.EPSILON]) {
@@ -136,6 +142,10 @@ exports.testInvalidInputs = async page => {
     const { Orbit } = window.test;
     const base = { a: 1, e: 0.1, i: 0, W: 0, wbar: 0, M: 0, n: 1, epoch: 2451545 };
     const invalid = [null,
+      // Check the selected fallback itself before addition can coerce null,
+      // booleans or other malformed values into a plausible numeric angle.
+      ...[null, undefined].flatMap(wbar => [null, false, true, undefined, "0", "", NaN, Infinity, {}, []]
+        .map(w => ({ ...base, wbar, w }))),
       ...["a", "e", "i", "W", "wbar", "M", "epoch"].flatMap(key =>
         [NaN, Infinity, "0"].map(value => ({ ...base, [key]: value }))),
       ...[{ a: 0 }, { a: -1 }, { e: -0.1 }, { e: 1 }, { e: 2 },
