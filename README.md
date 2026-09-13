@@ -81,15 +81,39 @@ npx playwright install firefox webkit
 BROWSERS=chromium,firefox,webkit npm test
 ```
 
-Tests build the real app and exercise loading, playback, discoveries, colours, camera controls, resizing, graphics recovery and errors. They also compare GPU positions against the orbital model across the full catalogue at 12 dates, check extreme elliptical orbits with an independent solver, and compare rendered pixels in overview and close views. Results and screenshots go to `.context/tests/`. WebKit testing is not a substitute for testing Safari and iOS on their actual devices.
+Tests build the real app and exercise loading, playback, discoveries, colours, camera controls, resizing, graphics recovery and errors. They also compare GPU positions against the orbital model across the full catalogue at 12 dates, check extreme elliptical orbits with an independent solver, and compare rendered pixels in overview and close views. WebKit testing is not a substitute for testing Safari and iOS on their actual devices.
+
+Each invocation replaces `.context/tests/report/` with fresh results and screenshots.
+`run.json` records the current stage, outcome and failure stack, including build or
+browser-launch failures, browser versions and the WebGL renderer; `results.json`
+retains completed browser results. Per-page
+JSONL logs include console messages, page errors and failed requests. Helper pages
+are captured before cleanup, and still-open pages are captured on failure. The
+suite deliberately exercises loading errors and diagnostics failures, so recorded
+console errors alone do not determine its outcome. Check `run.json` and the exit code.
 
 ## Deployment
 
 [GitHub Pages](https://sn3p.github.io/Orrery3D/) updates automatically after every
 push or merged pull request to `master`. The [GitHub Pages workflow](.github/workflows/pages.yml)
 installs locked dependencies with the Node.js version in `.nvmrc`, builds a clean
-`dist/` from source, and deploys it. Pull requests targeting `master` check the
-production build without deploying. A failed build prevents deployment.
+`dist/` from source, and runs the full browser suite in separate Chrome, Firefox
+and WebKit jobs. Deployment requires the build and all three browser checks to
+pass. Pull requests targeting `master` run the same checks without deploying.
+Linux Firefox runs with a virtual display because its headless mode does not
+provide the WebGL 2 context required by this suite.
+Linux CI uses Mesa software GL (Chrome selects ANGLE's OpenGL backend). SwiftShader's
+trigonometric approximations exceed the existing orbital-error bound; the suite
+keeps the same shader and accuracy thresholds on the selected CI backend. Reports
+retain browser-reported WebGL information, which some browsers privacy-mask.
+Local runs use the browser defaults, so CI does not establish accuracy on every
+graphics driver.
+
+Each browser job retains a `browser-tests-<browser>` artifact for 14 days on
+success or failure, containing the report directory and runner output. Generated
+app/test bundles are excluded. Installation failures remain in the Actions step
+logs; a hard cancellation may prevent the artifact upload. CI rendering is a
+correctness check, not a hardware-performance benchmark.
 
 Overlapping runs for the same branch retain up to 100 pending runs, processed in
 the order they enter GitHub's concurrency queue. New runs beyond that limit are
