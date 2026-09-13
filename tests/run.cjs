@@ -4,8 +4,13 @@ const path = require("node:path");
 const http = require("node:http");
 const webpack = require("webpack");
 const browsers = require("playwright");
+const Diagnostics = require("./diagnostics.cjs");
 const root = path.resolve(__dirname, "..");
-const output = path.join(root, ".context/tests");
+const buildOutput = path.join(root, ".context/tests");
+const output = path.join(buildOutput, "report");
+// This generated report belongs to one invocation, including failed builds.
+fs.rmSync(output, { recursive: true, force: true });
+const diagnostics = new Diagnostics(output);
 
 async function checkUiTypography(page) {
   await page.evaluate(() => document.fonts.ready);
@@ -51,24 +56,32 @@ async function build(entry, directory) {
 }
 
 async function main() {
+  diagnostics.stage("pure catalogue preparation");
   await require("./catalogue-preparation.cjs").testPurePreparation();
-  await build("./tests/browser.js", path.join(output, "fixture"));
-  await build("./src/index.js", path.join(output, "production"));
+  diagnostics.stage("build browser fixture");
+  await build("./tests/browser.js", path.join(buildOutput, "fixture"));
+  diagnostics.stage("build production app");
+  await build("./src/index.js", path.join(buildOutput, "production"));
   const server = http.createServer((req, res) => {
     const pathname = new URL(req.url, "http://localhost").pathname;
     if (pathname.endsWith("/favicon.ico")) { res.writeHead(204); res.end(); return; }
-    const filename = path.resolve(output, "." + (pathname.endsWith("/") ? pathname + "index.html" : pathname));
-    if (!filename.startsWith(output + path.sep) || !fs.existsSync(filename)) { res.writeHead(404); res.end(); return; }
+    const filename = path.resolve(buildOutput, "." + (pathname.endsWith("/") ? pathname + "index.html" : pathname));
+    if (!filename.startsWith(buildOutput + path.sep) || !fs.existsSync(filename)) { res.writeHead(404); res.end(); return; }
     res.setHeader("Content-Type", { ".html": "text/html", ".js": "text/javascript", ".css": "text/css", ".json": "application/json" }[path.extname(filename)] || "application/octet-stream");
     fs.createReadStream(filename).pipe(res);
   });
   await new Promise(resolve => server.listen(0, "127.0.0.1", resolve));
   const url = `http://127.0.0.1:${server.address().port}`;
-  const report = [];
+  const report = diagnostics.results;
   try {
     for (const name of (process.env.BROWSERS || "chromium").split(",")) {
-      const browser = await browsers[name].launch({ headless: process.env.HEADLESS !== "0", ...(name === "chromium" ? { channel: "chrome" } : {}) });
+      diagnostics.stage(`${name}: launch`);
+      const instance = await browsers[name].launch({ headless: process.env.HEADLESS !== "0", ...(name === "chromium" ? { channel: "chrome" } : {}) });
       try {
+        diagnostics.stage(`${name}: diagnostic failure regressions`);
+        const diagnosticChecks = await require("./diagnostics-regression.cjs")(instance, output, name);
+        const browser = diagnostics.browser(instance, name);
+        diagnostics.stage(`${name}: fixture and numerical regressions`);
         const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
         const errors = [];
         page.on("pageerror", error => errors.push(error.message));
@@ -222,6 +235,7 @@ async function main() {
         result.catalogueReplacement = catalogueReplacement;
         result.phaseUploads = phaseUploads;
         result.shader = await page.evaluate(() => window.test.validateShader(window.test.app, window.test.catalog));
+        diagnostics.stage(`${name}: controls, layout and context recovery`);
         const speed = page.getByRole("textbox", { name: "Playback speed" });
         await speed.fill("1.5"); await speed.press("Enter");
         assert.equal(await page.evaluate(() => window.test.app.jedDelta), 1.5);
@@ -284,6 +298,7 @@ async function main() {
         result.planetFramesAfterReload = await require("./planet-bodies.cjs").testScene(page);
         result.sphereBodiesAfterReload = await require("./planet-bodies.cjs").testBodies(page);
         assert.deepEqual(errors, []);
+        diagnostics.stage(`${name}: production loading, memory and interactions`);
         if (name === "chromium") result.catalogueMemory = await require("./catalogue-memory.cjs")(browser, url + "/production/");
         // Actual production build, without a test API.
         await page.goto(url + "/production/");
@@ -296,6 +311,7 @@ async function main() {
         result.productionInteractions = await require("./rendering.cjs").testProductionInteractions(browser, url + "/production/", output, name);
         assert.deepEqual(errors, []);
         result.catalogueLoading = await require("./catalogue-preparation.cjs").testLoading(browser, url + "/production/");
+        diagnostics.stage(`${name}: expected loading and WebGL errors`);
         // Loading and failure through the real fetch/boot boundary.
         await page.route("**/data/catalog.json", async route => {
           await new Promise(resolve => setTimeout(resolve, 200));
@@ -321,12 +337,20 @@ async function main() {
         await page.reload(); await page.getByRole("alert").waitFor();
         assert.match(await page.getByRole("alert").textContent(), /WebGL 2 is required/);
         assert.equal(await page.locator(".dg.main").count(), 0, "No controls for an unavailable renderer");
+        diagnostics.stage(`${name}: benchmark workflow`);
         result.benchmark = await require("./benchmark.cjs")(browser, output, name);
-        report.push({ browser: name, version: browser.version(), cataloguePreparation, transferredCloud, ...result, contextRecovery: lossSupported, checks: "passed" });
+        report.push({ browser: name, version: browser.version(), diagnosticChecks, cataloguePreparation, transferredCloud, ...result, contextRecovery: lossSupported, checks: "passed" });
         fs.writeFileSync(path.join(output, "results.json"), JSON.stringify(report, null, 2));
         console.log(`${name}: production, controls, timing, discoveries, bounds, replacement, colours, recovery, errors, shader accuracy passed`);
-      } finally { await browser.close(); }
+      } catch (error) {
+        await diagnostics.fail(error);
+        throw error;
+      } finally { await instance.close(); }
     }
   } finally { await new Promise(resolve => server.close(resolve)); }
 }
-main().catch(error => { console.error(error); process.exitCode = 1; });
+main().then(() => diagnostics.pass()).catch(async error => {
+  console.error(error);
+  process.exitCode = 1;
+  if (diagnostics.run.status !== "failed") await diagnostics.fail(error);
+});
