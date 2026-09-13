@@ -84,9 +84,8 @@ dat.GUI overrides
 
 .orrery-options-indicator {
   display: inline-block;
-  font-size: 10px;
+  font-size: 11px;
   line-height: 1;
-  vertical-align: 1px;
 }
 
 .orrery-options-trigger:hover {
