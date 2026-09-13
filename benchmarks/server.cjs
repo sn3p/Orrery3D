@@ -4,11 +4,11 @@ const http = require("node:http");
 const webpack = require("webpack");
 const root = path.resolve(__dirname, "..");
 
-async function serve(port = 0) {
+async function serve(port = 0, entry = path.join(__dirname, "browser.js")) {
   const output = path.join(root, ".context/benchmark/build");
   await new Promise((resolve, reject) => {
     const compiler = webpack({
-      mode: "production", entry: path.join(__dirname, "browser.js"),
+      mode: "production", entry,
       output: { path: output, filename: "benchmark.js" },
       performance: { hints: false },
     });

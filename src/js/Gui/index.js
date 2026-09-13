@@ -44,4 +44,14 @@ export default class Gui {
       this.lastCount = this.orrery.asteroidsDiscovered;
     }
   }
+
+  hide() {
+    this.gui.hide();
+  }
+
+  dispose() {
+    if (this.disposed) return;
+    this.disposed = true;
+    this.gui.destroy();
+  }
 }

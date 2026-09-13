@@ -76,6 +76,8 @@ async function main() {
         await page.goto(url + "/fixture/");
         await page.evaluate(() => window.testReady);
         await page.waitForFunction(() => window.test.app.asteroidsDiscovered > 0);
+        const sharedFrames = await require("./frame-operations.cjs").testSharedFrames(page);
+        const fps = await require("./frame-operations.cjs").testFps(page);
         const saturn = await require("./planets.cjs")(page);
         const orbitTracks = await require("./orbit-tracks.cjs")(page);
         const cataloguePreparation = await require("./catalogue-preparation.cjs").testReplacement(page);
@@ -195,6 +197,8 @@ async function main() {
           app.gui.gui.updateDisplay();
           return { timing, catalog: catalog.length, fresh, faded, instant, hidden };
         });
+        result.sharedFrames = sharedFrames;
+        result.fps = fps;
         result.pausedRendering = pausedRendering;
         result.saturn = saturn;
         result.orbitTracks = orbitTracks;
@@ -243,6 +247,7 @@ async function main() {
           assert.equal(await canvasImage(), beforeLoss, "Context restoration automatically recovers the rendered scene");
         }
         if (lossSupported) result.runningContextRecovery = await require("./rendering.cjs").testRunningContextRecovery(page);
+        result.guiDisposal = await require("./frame-operations.cjs").testGuiDisposal(page);
         await page.evaluate(() => {
           const { app, Orrery3D, catalog } = window.test;
           app.dispose(); app.dispose();
@@ -295,10 +300,7 @@ async function main() {
         await page.reload(); await page.getByRole("alert").waitFor();
         assert.match(await page.getByRole("alert").textContent(), /WebGL 2 is required/);
         assert.equal(await page.locator(".dg.main").count(), 0, "No controls for an unavailable renderer");
-        if (name === "chromium") {
-          await require("./benchmark.cjs")(browser, output);
-          result.benchmark = "resize interruption, recovery and JSON download passed";
-        }
+        result.benchmark = await require("./benchmark.cjs")(browser, output, name);
         report.push({ browser: name, version: browser.version(), cataloguePreparation, transferredCloud, ...result, contextRecovery: lossSupported, checks: "passed" });
         fs.writeFileSync(path.join(output, "results.json"), JSON.stringify(report, null, 2));
         console.log(`${name}: production, controls, timing, discoveries, bounds, replacement, colours, recovery, errors, shader accuracy passed`);

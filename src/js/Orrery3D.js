@@ -201,24 +201,30 @@ export default class Orrery3D {
       return;
     }
 
-    this.gui.stats.begin();
+    this.renderFrame(this.jed + this.clock.advance(timestamp, this.jedDelta));
+    if (this.isPlaying) this.requestRender();
+  };
 
-    // Internal playback advances do not invalidate the paused scene.
-    this._jed += this.clock.advance(timestamp, this.jedDelta);
-
-    this.planets.forEach((planet) => planet.render(this.jed));
-
+  // Shared scene work; callers own date advancement and scheduling. Optional
+  // benchmark hooks keep asteroid CPU time and GPU draw time separate.
+  renderFrame(jed = this.jed, { afterAsteroids, beforeRender, afterRender, trackFps = this.isPlaying } = {}) {
+    if (this.disposed || document.hidden || this.contextLost) return;
+    // Explicit dates do not invalidate the scene or advance the playback clock.
+    this._jed = jed;
     if (this.asteroidsGeometry) {
       this.updateAsteroids();
     }
+    afterAsteroids?.();
+    this.planets.forEach((planet) => planet.render(this.jed));
 
+    beforeRender?.();
     this.renderer.render(this.scene, this.camera);
+    afterRender?.();
 
-    if (this.isPlaying) this.gui.stats.end();
+    if (trackFps) this.gui.stats.update();
     else this.gui.stats.reset();
     this.gui.update();
-    if (this.isPlaying) this.requestRender();
-  };
+  }
 
   resize = () => {
     this.camera.aspect = window.innerWidth / window.innerHeight;
@@ -239,7 +245,7 @@ export default class Orrery3D {
     this.renderer.domElement.removeEventListener("webglcontextrestored", this.onContextRestored);
     this.controls.removeEventListener("change", this.requestRender);
     this.controls.dispose();
-    this.gui.gui.destroy();
+    this.gui.dispose();
     this.disposeSceneResources();
     this.renderer.dispose();
     this.renderer.domElement.remove();
