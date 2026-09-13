@@ -53,7 +53,7 @@ exports.testOptions = async (browser, url, output, name) => {
     assert(await speed.evaluate(el => el === document.activeElement), "Opening moves focus to the first control");
     await expect(speed).toHaveAccessibleDescription("0 pauses; negative reverses. 1 = 60 days per second.");
     const dprHelp = await page.locator("#" + await dpr.getAttribute("aria-describedby")).textContent();
-    assert.equal(dprHelp, "Starts at 1×. 2× adds detail and graphics work.");
+    assert.equal(dprHelp, "Rendering resolution. 2× is sharper but requires more graphics processing.");
     assert.equal(await dpr.getAttribute("title"), dprHelp);
     const styles = await panel.evaluate(el => ({
       background: getComputedStyle(el).backgroundColor,

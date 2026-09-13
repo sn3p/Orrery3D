@@ -52,7 +52,7 @@ export default class Gui {
     this.pixelRatio = this.gui.add(this.orrery, "pixelRatio", { "1×": "1", "2×": "2" }).name("DPR");
     this.pixelRatioSelect = this.pixelRatio.domElement.querySelector("select");
     this.pixelRatioSelect.setAttribute("aria-label", "Rendering pixel ratio");
-    this.pixelRatioSelect.title = "Starts at 1×. 2× adds detail and graphics work.";
+    this.pixelRatioSelect.title = "Rendering resolution. 2× is sharper but requires more graphics processing.";
     this.addHint(this.pixelRatio, this.pixelRatioSelect.title, this.pixelRatioSelect);
     this.updatePixelRatio();
     this.trigger.addEventListener("click", this.onToggle);
