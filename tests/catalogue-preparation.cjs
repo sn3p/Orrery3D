@@ -14,6 +14,8 @@ exports.testPurePreparation = async () => {
   assert.deepEqual([...packed.dates], [REFERENCE_JED, REFERENCE_JED, REFERENCE_JED + 0.125]);
   assert.deepEqual(records.map(record => record.a), [3, 1, 2], "Frozen input is never changed");
   assert(packed.phases instanceof Float64Array && packed.dates instanceof Float64Array);
+  assert.equal(Object.values(packed).filter(ArrayBuffer.isView).reduce((bytes, array) => bytes + array.byteLength, 0),
+    records.length * 64, "Splitting phases does not increase typed-array storage");
   assert.equal(packed.radius, 300);
   assert.equal(packed.epoch, REFERENCE_JED);
   const empty = prepareCatalogue([], REFERENCE_JED);
@@ -82,7 +84,9 @@ exports.testTransferredCloud = async page => {
       const jed = REFERENCE_JED + delta;
       const cloud = new Asteroids(packed, { ...options, jed });
       try {
-        if (cloud.geometry.attributes.position.array !== packed.p || cloud.phases !== packed.phases
+        if (cloud.geometry.attributes.position.array !== packed.p
+          || cloud.geometry.attributes.elements.array !== packed.elements
+          || cloud.geometry.attributes.meanAnomaly.array !== packed.meanAnomalies || cloud.phases !== packed.phases
           || cloud.discoveryDates !== packed.dates) throw new Error("Renderer copied prepared buffers");
         const expectedEpoch = Math.abs(delta) > REBASE_DAYS ? jed : REFERENCE_JED;
         if (cloud.epoch !== expectedEpoch || cloud.uniforms.orbitTime.value !== jed - expectedEpoch) {
@@ -94,7 +98,8 @@ exports.testTransferredCloud = async page => {
         cloud.update(jed + REBASE_DAYS * 2);
         cloud.update(jed - REBASE_DAYS * 2);
         const expected = prepareCatalogue(data, jed - REBASE_DAYS * 2);
-        if (!cloud.geometry.attributes.elements.array.every((value, index) => value === expected.elements[index])) {
+        if (!cloud.geometry.attributes.elements.array.every((value, index) => value === expected.elements[index])
+          || !cloud.geometry.attributes.meanAnomaly.array.every((value, index) => value === expected.meanAnomalies[index])) {
           throw new Error("Transferred phases changed a subsequent refresh");
         }
         checks.push({ delta, transferredBytes: Object.values(packed).filter(ArrayBuffer.isView)

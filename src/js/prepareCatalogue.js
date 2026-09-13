@@ -7,7 +7,7 @@ export const wrapPhase = value => value - TAU * Math.floor((value + Math.PI) / T
 // Pure CPU preparation: no Three.js, DOM, fetch or GPU resource allocation.
 // The result owns its typed buffers, retains no input records, and can be
 // transferred between threads. Hand ownership to one Asteroids instance;
-// its phase refresh mutates elements. Epoch records when those phases apply.
+// its phase refresh mutates meanAnomalies. Epoch records when they apply.
 export function prepareCatalogue(data, epoch) {
   if (!Number.isFinite(epoch)) throw new Error("Invalid asteroid date.");
   if (!Array.isArray(data)) throw new Error("The asteroid catalogue must be an array.");
@@ -27,7 +27,8 @@ export function prepareCatalogue(data, epoch) {
     .sort((a, b) => data[a].disc - data[b].disc);
   const count = sorted.length;
   const p = new Float32Array(count * 3), q = new Float32Array(count * 3);
-  const elements = new Float32Array(count * 3), discovery = new Float32Array(count);
+  const elements = new Float32Array(count * 2), meanAnomalies = new Float32Array(count);
+  const discovery = new Float32Array(count);
   const phases = new Float64Array(count * 2), dates = new Float64Array(count);
   let radius = 0;
   sorted.forEach((sourceIndex, index) => {
@@ -49,19 +50,21 @@ export function prepareCatalogue(data, epoch) {
       b * (-Math.sin(o) * Math.sin(w) + Math.cos(o) * Math.cos(w) * Math.cos(inc)),
       b * Math.cos(w) * Math.sin(inc),
     ], offset);
-    elements.set([d.e, wrapPhase(mean + n * (epoch - REFERENCE_JED)), n], offset);
+    elements.set([d.e, n], index * 2);
+    meanAnomalies[index] = wrapPhase(mean + n * (epoch - REFERENCE_JED));
     phases.set([mean, n], index * 2);
     dates[index] = d.disc;
     discovery[index] = d.disc - REFERENCE_JED;
     radius = Math.max(radius, a * (1 + d.e));
-    let finite = Number.isFinite(discovery[index]) && Number.isFinite(radius);
+    let finite = Number.isFinite(discovery[index]) && Number.isFinite(radius)
+      && Number.isFinite(meanAnomalies[index]) && Number.isFinite(elements[index * 2])
+      && Number.isFinite(elements[index * 2 + 1]);
     for (let axis = 0; axis < 3; axis++) {
-      finite = finite && Number.isFinite(p[offset + axis]) && Number.isFinite(q[offset + axis])
-        && Number.isFinite(elements[offset + axis]);
+      finite = finite && Number.isFinite(p[offset + axis]) && Number.isFinite(q[offset + axis]);
     }
     if (!finite) {
       throw new Error(`Orbit exceeds rendering precision at catalogue entry ${sourceIndex + 1}.`);
     }
   });
-  return { p, q, elements, discovery, phases, dates, radius, epoch };
+  return { p, q, elements, meanAnomalies, discovery, phases, dates, radius, epoch };
 }
