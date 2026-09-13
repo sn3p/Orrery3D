@@ -72,13 +72,19 @@ dat.GUI overrides
 .orrery-options-trigger {
   display: block;
   margin-left: auto;
-  padding: 0 3px;
+  padding: 0 3px 4px;
   border: 0;
   background: black;
   color: #999;
   font: inherit;
-  line-height: 22px;
+  font-size: 12px;
+  line-height: 18px;
   cursor: pointer;
+}
+
+.orrery-options-indicator {
+  display: inline-block;
+  transform: translateY(1px);
 }
 
 .orrery-options-trigger:hover {
