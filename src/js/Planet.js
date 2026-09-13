@@ -1,5 +1,5 @@
-import * as THREE from "three";
 import Orbit from "./Orbit";
+import createSphere from "./createSphere";
 
 export default class Planet {
   static defaultOptions = {
@@ -11,22 +11,12 @@ export default class Planet {
   constructor(ephemeris, options = {}) {
     this.options = Object.assign({}, Planet.defaultOptions, options);
     this.ephemeris = ephemeris;
-
-    // Body
-    this.body = new THREE.Mesh(
-      new THREE.SphereGeometry(
-        this.options.size,
-        this.options.segments,
-        this.options.segments
-      ),
-      new THREE.MeshBasicMaterial({
-        color: this.options.color
-      })
-    );
+    this.orbit = new Orbit(ephemeris);
+    this.body = createSphere(this.options);
   }
 
   render(jed) {
-    const pos = Orbit.getPosAtTime(this.ephemeris, jed);
-    this.body.position.set(...pos);
+    if (!this.orbit.matches(this.ephemeris)) this.orbit = new Orbit(this.ephemeris);
+    this.orbit.getPosAtTime(jed, this.body.position);
   }
 }

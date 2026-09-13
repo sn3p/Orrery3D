@@ -1,4 +1,4 @@
-import * as THREE from "three";
+import createSphere from "./createSphere";
 
 export default class Sun {
   static defaultOptions = {
@@ -9,17 +9,6 @@ export default class Sun {
 
   constructor(options) {
     this.options = Object.assign({}, Sun.defaultOptions, options);
-
-    // Create body
-    this.body = new THREE.Mesh(
-      new THREE.SphereGeometry(
-        this.options.size,
-        this.options.segments,
-        this.options.segments
-      ),
-      new THREE.MeshBasicMaterial({
-        color: this.options.color
-      })
-    );
+    this.body = createSphere(this.options);
   }
 }
