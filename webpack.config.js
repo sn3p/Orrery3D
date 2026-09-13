@@ -39,15 +39,10 @@ module.exports = {
       },
       {
         test: /\.json$/,
-        type: "javascript/auto",
-        use: [
-          {
-            loader: "file-loader",
-            options: {
-              name: "data/[name].[ext]",
-            },
-          },
-        ],
+        type: "asset/resource",
+        generator: {
+          filename: "data/[name][ext]",
+        },
       },
     ],
   },
