@@ -11,7 +11,7 @@ import { prepareCatalogue } from "./prepareCatalogue";
 import PlaybackClock from "./PlaybackClock";
 
 const pixelRatioKey = "orrery3d.pixelRatio";
-const pixelRatioChoice = value => ["1", "2", "3"].includes(value) ? value : "auto";
+const pixelRatioChoice = value => ["auto", "1", "2", "3"].includes(value) ? value : "1";
 
 export default class Orrery3D {
   constructor(options = {}) {
@@ -19,10 +19,10 @@ export default class Orrery3D {
     this.startDate = options.startDate || new Date(1980, 1);
     this._jedDelta = options.jedDelta ?? 1.5;
     this.rememberPixelRatio = options.rememberPixelRatio ?? true;
-    this._pixelRatio = "auto";
+    this._pixelRatio = "1";
     if (this.rememberPixelRatio) {
       try { this._pixelRatio = pixelRatioChoice(localStorage.getItem(pixelRatioKey)); }
-      catch { /* Storage may be unavailable; keep the display default. */ }
+      catch { /* Storage may be unavailable; keep the 1× default. */ }
     }
     this.asteroidColor = new THREE.Color(options.asteroidColor ?? 0x999999);
     this.asteroidDiscoveryColor = new THREE.Color(options.asteroidDiscoveryColor ?? 0x00ff00);
@@ -81,8 +81,7 @@ export default class Orrery3D {
     this._pixelRatio = ratio;
     if (this.rememberPixelRatio) {
       try {
-        if (ratio === "auto") localStorage.removeItem(pixelRatioKey);
-        else localStorage.setItem(pixelRatioKey, ratio);
+        localStorage.setItem(pixelRatioKey, ratio);
       } catch { /* The choice still works for this session when storage is blocked. */ }
     }
     this.resize();

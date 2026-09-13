@@ -161,7 +161,7 @@ Click **[+] options** in the top-right corner to open the speed and rendering co
 
 Playback follows elapsed time: speed `1` means 60 simulated days per second, `0` pauses, and negative speeds reverse. The default `1.5` preserves the old pace at 60 FPS. Hidden tabs and lost graphics contexts pause playback.
 
-On high-DPI displays, the **DPR** control offers **Auto** (the display's native pixel ratio) and manual **1×**, **2×** or **3×** choices up to the current display ratio. Lower values reduce sharpness and graphics work. The choice is remembered across reloads when browser storage is available; Auto clears the saved override. A saved manual choice is capped at the current display ratio and resumes when a higher-DPI display is available. The control is hidden at DPR 1 or below. Benchmarks use their own requested DPR.
+Rendering defaults to **1×** for a softer appearance. On high-DPI displays, the **DPR** control offers **Auto** (the display's native pixel ratio) and manual **1×**, **2×** or **3×** choices up to the current display ratio. Lower values reduce sharpness and graphics work. The selected mode, including Auto, is remembered across reloads when browser storage is available. A saved manual choice is capped at the current display ratio and resumes when a higher-DPI display is available. The control is hidden at DPR 1 or below. Benchmarks use their own requested DPR.
 
 At speed `0`, the scene renders only when the camera, date, catalogue or viewport changes, or graphics reconnect. The readout shows `0 FPS` while paused. Resuming playback excludes time spent paused or disconnected.
 

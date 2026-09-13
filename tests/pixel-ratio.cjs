@@ -55,21 +55,31 @@ module.exports = async (browser, url, output, name) => {
     await installDprProbe(page);
     await page.goto(url); await boot();
     assert.equal(await control.count(), 1, "High-DPI display exposes the DPR control");
-    assert.equal(await control.inputValue(), "auto");
+    assert.equal(await control.inputValue(), "1", "Fresh production boot defaults to 1×");
     assert.deepEqual(await control.locator("option").evaluateAll(options => options.map(o => o.value)), ["auto", "1", "2", "3"]);
+    await checkBuffer(page, 1);
+    assert.equal(await page.evaluate(key => localStorage.getItem(key), key), null, "Boot does not invent a saved preference");
+    await page.screenshot({ path: path.join(output, `${name}-dpr-default-desktop.png`) });
+    await page.reload(); await boot();
+    assert.equal(await control.inputValue(), "1", "An unset preference stays at 1× after reload");
+    await checkBuffer(page, 1);
+    await choose("auto");
     await checkBuffer(page, 3);
     await page.screenshot({ path: path.join(output, `${name}-dpr-auto-desktop.png`) });
 
     for (const ratio of [1, 2, 3]) {
       await choose(String(ratio)); await checkBuffer(page, ratio);
       assert.equal(await page.evaluate(key => localStorage.getItem(key), key), String(ratio));
+      await page.reload(); await boot();
+      assert.equal(await control.inputValue(), String(ratio), "Reload preserves each manual choice");
+      await checkBuffer(page, ratio);
     }
     // Native select stays focused and operable with the keyboard.
     await control.focus(); await control.press("a"); await control.press("Enter");
     await settle(page);
     assert.equal(await control.inputValue(), "auto");
     assert(await control.evaluate(el => el === document.activeElement));
-    assert.equal(await page.evaluate(key => localStorage.getItem(key), key), null);
+    assert.equal(await page.evaluate(key => localStorage.getItem(key), key), "auto");
     await checkBuffer(page, 3);
 
     await choose("2");
@@ -143,13 +153,14 @@ module.exports = async (browser, url, output, name) => {
     assert.equal(await control.inputValue(), "auto");
     // Invalid stored input and unavailable storage do not break boot or control changes.
     await page.evaluate(key => localStorage.setItem(key, "not-a-ratio"), key);
-    await page.reload(); await boot(); await checkBuffer(page, 3);
-    assert.equal(await control.inputValue(), "auto");
+    await page.reload(); await boot(); await checkBuffer(page, 1);
+    assert.equal(await control.inputValue(), "1");
     await page.addInitScript(() => {
       Object.defineProperty(window, "localStorage", { get() { throw new DOMException("Storage blocked", "SecurityError"); } });
     });
-    await page.reload(); await boot(); await checkBuffer(page, 3);
-    await choose("1"); await checkBuffer(page, 1);
+    await page.reload(); await boot(); await checkBuffer(page, 1);
+    await choose("auto"); await checkBuffer(page, 3);
+    await page.reload(); await boot(); await checkBuffer(page, 1);
     assert.deepEqual(errors, []);
   } finally {
     if (cdp) await cdp.detach();
@@ -165,6 +176,6 @@ module.exports = async (browser, url, output, name) => {
     await checkBuffer(standard, 1);
     await standard.screenshot({ path: path.join(output, `${name}-dpr-standard.png`) });
   } finally { await standard.close(); }
-  return { choicesAndKeyboard: "passed", persistenceAndStorageErrors: "passed", lifecycle: "passed",
+  return { freshDefaultAndReload: "1×", choicesAndKeyboard: "passed", persistenceAndStorageErrors: "passed", lifecycle: "passed",
     desktopAndNarrow: "passed", displayTransitions: name === "chromium" ? "CDP with delivered media events" : "not exercised" };
 };

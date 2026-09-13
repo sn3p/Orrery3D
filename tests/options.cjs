@@ -49,6 +49,7 @@ exports.testOptions = async (browser, url, output, name) => {
     for (const hint of styles.hints) assert(brightness(hint.label) > brightness(hint.help), "Labels are brighter than help text");
     assert(styles.select, "DPR select has a visible border on every side");
     await speed.fill("0"); await speed.press("Enter");
+    await dpr.selectOption("2");
     await dpr.selectOption("1");
     await page.waitForFunction(() => document.querySelector("#orrery-fps").textContent === "0 FPS");
     await page.evaluate(() => {

@@ -20,10 +20,10 @@ module.exports = async function testBenchmark(browser, output, name) {
     assert.deepEqual(frames.steps, [1.5, 0, -1.5]);
     assert.equal(frames.drawsAfterCompletion, 0);
     await page.screenshot({ path: path.join(output, `${name}-benchmark-desktop.png`) });
-    // A real viewport resize invokes Orrery3D.resize(), which restores native DPR.
-    // An explicitly DPR-1 run must not publish a mixture of DPR-1/DPR-2 samples.
+    // A real viewport resize invokes Orrery3D.resize(), restoring the app's DPR 1.
+    // An explicitly DPR-2 run must not publish a mixture of DPR-2/DPR-1 samples.
     await page.evaluate(() => {
-      window.resizeResult = window.benchmark.measure({ count: 10000, dpr: 1, warmup: 0, frames: 120 })
+      window.resizeResult = window.benchmark.measure({ count: 10000, dpr: 2, warmup: 0, frames: 120 })
         .then(() => "accepted", error => error.message);
     });
     await page.setViewportSize({ width: 390, height: 844 });
