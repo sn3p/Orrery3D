@@ -100,14 +100,13 @@ installs locked dependencies with the Node.js version in `.nvmrc`, builds a clea
 `dist/` from source, and runs the full browser suite in separate Chrome, Firefox
 and WebKit jobs. Deployment requires the build and all three browser checks to
 pass. Pull requests targeting `master` run the same checks without deploying.
-Linux Firefox runs with a virtual display because its headless mode does not
-provide the WebGL 2 context required by this suite.
+Linux Chrome and Firefox run with a virtual display. Chrome avoids intermittent
+headless surface-capture failures; Firefox's headless mode does not provide the
+WebGL 2 context required by this suite.
 Linux CI uses Mesa software GL (Chrome selects ANGLE's OpenGL backend). SwiftShader's
 trigonometric approximations exceed the existing orbital-error bound; the suite
 keeps the same shader and accuracy thresholds on the selected CI backend. Reports
 retain browser-reported WebGL information, which some browsers privacy-mask.
-Chrome uses CPU compositing in Linux CI to keep screenshot capture separate from
-ANGLE; WebGL rendering still uses Mesa.
 Local runs use the browser defaults, so CI does not establish accuracy on every
 graphics driver.
 

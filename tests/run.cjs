@@ -81,9 +81,7 @@ async function main() {
         ...(name === "chromium" ? { channel: "chrome",
           // SwiftShader's trigonometric approximations exceed our unchanged
           // orbital-error bound. Use Mesa's GL implementation in Linux CI.
-          // Keep browser compositing off ANGLE: headless surface captures can
-          // return empty images on Mesa. WebGL still uses the selected GL backend.
-          ...(linuxCI ? { args: ["--use-angle=gl", "--ignore-gpu-blocklist", "--disable-gpu-compositing"] } : {}) } : {}) });
+          ...(linuxCI ? { args: ["--use-angle=gl", "--ignore-gpu-blocklist"] } : {}) } : {}) });
       try {
         diagnostics.stage(`${name}: diagnostic failure regressions`);
         const diagnosticChecks = await require("./diagnostics-regression.cjs")(instance, output, name);

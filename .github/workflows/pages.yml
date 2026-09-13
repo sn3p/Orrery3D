@@ -27,7 +27,7 @@ jobs:
         include:
           - browser: chromium
             install: chrome
-            headless: "1"
+            headless: "0"
           - browser: firefox
             install: firefox
             headless: "0"
@@ -55,7 +55,8 @@ jobs:
       - name: Run browser regressions
         env:
           BROWSERS: ${{ matrix.browser }}
-          # Firefox needs an X display for WebGL 2 on the Linux runner.
+          # Chrome uses an X display for reliable surface screenshots;
+          # Firefox requires it for WebGL 2 on the Linux runner.
           HEADLESS: ${{ matrix.headless }}
           # Use Mesa for reproducible software GL, including Chrome via ANGLE.
           LIBGL_ALWAYS_SOFTWARE: "1"
