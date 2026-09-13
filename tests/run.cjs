@@ -86,6 +86,7 @@ async function main() {
         const invalidCpuOrbits = await require("./cpu-orbits.cjs").testInvalidInputs(page);
         const cataloguePreparation = await require("./catalogue-preparation.cjs").testReplacement(page);
         const transferredCloud = await require("./catalogue-preparation.cjs").testTransferredCloud(page);
+        const phaseUploads = await require("./phase-uploads.cjs")(page);
         const catalogueReplacement = name === "chromium"
           ? await require("./catalogue-memory.cjs").testReplacement(page) : undefined;
         await checkUiTypography(page);
@@ -136,9 +137,9 @@ async function main() {
           app.jed += 1; app.updateAsteroids();
           for (const [key, version] of Object.entries(versions)) check(cloud.geometry.attributes[key].version === version, "Unexpected per-frame upload: " + key);
           app.jed = cloud.epoch + REBASE_DAYS + 1; app.updateAsteroids();
-          check(cloud.geometry.attributes.elements.version === versions.elements + 1, "Phase rebase");
+          check(cloud.geometry.attributes.meanAnomaly.version === versions.meanAnomaly + 1, "Phase rebase");
           check(cloud.uniforms.orbitTime.value === 0, "Relative time after rebase");
-          for (const key of ["position", "basisQ", "discovery"]) check(cloud.geometry.attributes[key].version === versions[key], "Rebase changed fixed attributes");
+          for (const key of ["position", "basisQ", "elements", "discovery"]) check(cloud.geometry.attributes[key].version === versions[key], "Rebase changed fixed attributes");
           for (const d of catalog.filter((_, i) => i % 997 === 0)) {
             for (const date of [2378861.5, REFERENCE_JED, 2488070.5]) {
               check(Math.hypot(...Orbit.getPosAtTime(d, date)) <= cloud.geometry.boundingSphere.radius, "Conservative orbit bound");
@@ -213,6 +214,7 @@ async function main() {
         result.readoutBoundaries = readoutBoundaries;
         result.pausedLifecycle = pausedLifecycle;
         result.catalogueReplacement = catalogueReplacement;
+        result.phaseUploads = phaseUploads;
         result.shader = await page.evaluate(() => window.test.validateShader(window.test.app, window.test.catalog));
         const speed = page.getByRole("textbox", { name: "Playback speed" });
         await speed.fill("1.5"); await speed.press("Enter");
@@ -255,6 +257,7 @@ async function main() {
           assert.equal(await canvasImage(), beforeLoss, "Context restoration automatically recovers the rendered scene");
         }
         if (lossSupported) result.runningContextRecovery = await require("./rendering.cjs").testRunningContextRecovery(page);
+        if (lossSupported) result.phaseUploadsAfterRecovery = await require("./phase-uploads.cjs")(page);
         result.guiDisposal = await require("./frame-operations.cjs").testGuiDisposal(page);
         await page.evaluate(() => {
           const { app, Orrery3D, catalog } = window.test;

@@ -124,7 +124,7 @@ async function measure(options) {
     const refresh = frame(app.asteroids.epoch + REBASE_DAYS + 1);
     result.phaseRefresh = { updateMs: refresh.update, mainThreadMs: refresh.work,
       frameIntervalMs: (await nextFrame()) - beforeRefresh,
-      uploadBytes: app.asteroidsGeometry.attributes.elements.array.byteLength, intervalDays: REBASE_DAYS };
+      uploadBytes: app.asteroidsGeometry.attributes.meanAnomaly.array.byteLength, intervalDays: REBASE_DAYS };
     assertAvailable();
     status.textContent = `GPU · ${options.count.toLocaleString()} objects · ${result.fps.toFixed(1)} FPS\nFrame p95: ${result.frameMs.p95.toFixed(2)} ms · CPU update median: ${result.asteroidUpdateMs.median.toFixed(2)} ms`;
     return result;

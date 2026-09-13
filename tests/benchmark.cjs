@@ -35,7 +35,7 @@ module.exports = async function testBenchmark(browser, output, name) {
     const result = JSON.parse(fs.readFileSync(filename)).results[0];
     assert.equal(result.count, 10000); assert.equal(result.dpr, 2);
     assert.equal(result.samples.intervals.length, 180);
-    assert(result.fps > 0); assert.equal(result.phaseRefresh.uploadBytes, 120000);
+    assert(result.fps > 0); assert.equal(result.phaseRefresh.uploadBytes, 40000);
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth), 390);
     await page.screenshot({ path: path.join(output, `${name}-benchmark-narrow.png`) });
     assert.deepEqual(errors, []);

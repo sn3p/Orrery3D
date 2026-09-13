@@ -18,11 +18,11 @@ function transformFeedback(packed, dates, epoch = REFERENCE_JED) {
   const program = gl.createProgram();
   const vs = `#version 300 es
     precision highp float;
-    in vec3 p; in vec3 q; in vec3 elements; in float discovery;
+    in vec3 p; in vec3 q; in vec2 elements; in float meanAnomaly; in float discovery;
     uniform float time; uniform float discoveryTime; out vec3 positionOut; out vec3 colorOut;
     ${orbitGLSL}
     void main() {
-      positionOut = orbitPosition(p, q, elements, time);
+      positionOut = orbitPosition(p, q, elements, meanAnomaly, time);
       colorOut = discoveryColor(discoveryTime, discovery, 200.0, vec3(0,1,0), vec3(${oldColor.r}));
       gl_Position = vec4(positionOut, 1); gl_PointSize = 1.0;
     }`;
@@ -38,7 +38,7 @@ function transformFeedback(packed, dates, epoch = REFERENCE_JED) {
   const vao = gl.createVertexArray(); gl.bindVertexArray(vao);
   const sourceBuffer = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, sourceBuffer);
   gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(packed), gl.STATIC_DRAW);
-  for (const [name, size, offset] of [["p", 3, 0], ["q", 3, 3], ["elements", 3, 6], ["discovery", 1, 9]]) {
+  for (const [name, size, offset] of [["p", 3, 0], ["q", 3, 3], ["elements", 2, 6], ["meanAnomaly", 1, 8], ["discovery", 1, 9]]) {
     const location = gl.getAttribLocation(program, name); gl.enableVertexAttribArray(location);
     gl.vertexAttribPointer(location, size, gl.FLOAT, false, 40, offset * 4);
   }
@@ -70,7 +70,8 @@ function packedAttributes(cloud) {
   for (let i = 0; i < attributes.position.count; i++) {
     actual.set(attributes.position.array.subarray(i * 3, i * 3 + 3), i * 10);
     actual.set(attributes.basisQ.array.subarray(i * 3, i * 3 + 3), i * 10 + 3);
-    actual.set(attributes.elements.array.subarray(i * 3, i * 3 + 3), i * 10 + 6);
+    actual.set(attributes.elements.array.subarray(i * 2, i * 2 + 2), i * 10 + 6);
+    actual[i * 10 + 8] = attributes.meanAnomaly.array[i];
     actual[i * 10 + 9] = attributes.discovery.array[i];
   }
   return actual;
