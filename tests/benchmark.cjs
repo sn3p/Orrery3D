@@ -10,15 +10,20 @@ module.exports = async function testBenchmark(browser, output, name) {
   page.on("pageerror", error => errors.push(error.message));
   page.on("console", message => { if (message.type() === "error") errors.push(message.text()); });
   try {
+    await page.addInitScript(() => localStorage.setItem("orrery3d.pixelRatio", "1"));
     await page.goto(url); await page.evaluate(() => window.benchmark.ready);
+    assert.equal(await page.evaluate(() => document.querySelector("canvas").width), 1600,
+      "Benchmark preview uses native DPR independently of the app's 1× default and legacy preferences");
+    assert(await page.locator(".orrery-options").isHidden(), "Benchmark hides the options trigger and panel");
+    const highDpi = await require("./high-dpi.cjs").testBenchmarkDpr(page, name);
     const frames = await page.evaluate(() => window.benchmarkProbe.verify());
     assert.deepEqual(frames.steps, [1.5, 0, -1.5]);
     assert.equal(frames.drawsAfterCompletion, 0);
     await page.screenshot({ path: path.join(output, `${name}-benchmark-desktop.png`) });
-    // A real viewport resize invokes Orrery3D.resize(), which restores native DPR.
-    // An explicitly DPR-1 run must not publish a mixture of DPR-1/DPR-2 samples.
+    // A real viewport resize invokes Orrery3D.resize(), restoring the app's DPR 1.
+    // An explicitly DPR-2 run must not publish a mixture of DPR-2/DPR-1 samples.
     await page.evaluate(() => {
-      window.resizeResult = window.benchmark.measure({ count: 10000, dpr: 1, warmup: 0, frames: 120 })
+      window.resizeResult = window.benchmark.measure({ count: 10000, dpr: 2, warmup: 0, frames: 120 })
         .then(() => "accepted", error => error.message);
     });
     await page.setViewportSize({ width: 390, height: 844 });
@@ -39,7 +44,7 @@ module.exports = async function testBenchmark(browser, output, name) {
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth), 390);
     await page.screenshot({ path: path.join(output, `${name}-benchmark-narrow.png`) });
     assert.deepEqual(errors, []);
-    return { ...frames, interruptionRecoveryAndDownload: "passed" };
+    return { highDpi, ...frames, interruptionRecoveryAndDownload: "passed" };
   } finally {
     await page.close();
     await new Promise(resolve => server.close(resolve));

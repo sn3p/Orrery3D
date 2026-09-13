@@ -63,7 +63,9 @@ class Diagnostics {
     if (entry.page.isClosed()) return;
     const filename = `${entry.id}-${reason}.png`;
     try {
-      await entry.page.screenshot({ path: path.join(this.directory, filename), timeout: 5000 });
+      // Software rendering on CI may need extra time for its first capture.
+      // Keep cleanup bounded if the page or compositor is unresponsive.
+      await entry.page.screenshot({ path: path.join(this.directory, filename), timeout: 30000 });
       entry.log({ type: "screenshot", filename, reason });
     } catch (error) {
       entry.log({ type: "capture-error", reason, message: error.message });

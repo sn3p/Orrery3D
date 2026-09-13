@@ -15,6 +15,23 @@ function assertAvailable() {
   assert(!interrupted, "Benchmark interrupted; keep the tab visible and the window size unchanged, then run again.");
   assert(document.visibilityState === "visible", "Keep the benchmark tab visible; discard interrupted runs.");
   assert(!app.contextLost, "Graphics connection lost; run again after recovery.");
+  if (running) {
+    const expected = active.resolution, gl = app.renderer.getContext();
+    assert(devicePixelRatio === expected.nativeDpr && app.renderer.getPixelRatio() === expected.rendererDpr
+      && innerWidth === expected.viewport[0] && innerHeight === expected.viewport[1]
+      && gl.drawingBufferWidth === expected.drawingBuffer[0] && gl.drawingBufferHeight === expected.drawingBuffer[1],
+    "Benchmark interrupted by a resolution change; run again once the window is stable.");
+  }
+}
+
+function resolution() {
+  const gl = app.renderer.getContext();
+  return {
+    viewport: [innerWidth, innerHeight], nativeDpr: devicePixelRatio,
+    rendererDpr: app.renderer.getPixelRatio(),
+    drawingBuffer: [gl.drawingBufferWidth, gl.drawingBufferHeight],
+    effectiveDpr: [gl.drawingBufferWidth / innerWidth, gl.drawingBufferHeight / innerHeight],
+  };
 }
 
 function setup({ count, dpr = 1, camera = "overview", startJed = REFERENCE_JED }) {
@@ -31,6 +48,7 @@ function setup({ count, dpr = 1, camera = "overview", startJed = REFERENCE_JED }
   const start = performance.now();
   app.setupAsteroids(data);
   active = { count, dpr, camera, startJed, setupMs: performance.now() - start };
+  active.resolution = resolution();
 }
 
 function frame(jed, beforeRender, afterRender) {
@@ -49,7 +67,7 @@ function environment() {
   const debug = gl.getExtension("WEBGL_debug_renderer_info");
   return {
     userAgent: navigator.userAgent, three: THREE.REVISION,
-    viewport: [innerWidth, innerHeight], nativeDpr: devicePixelRatio,
+    ...resolution(),
     gpu: debug ? gl.getParameter(debug.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER),
     webglVersion: gl.getParameter(gl.VERSION),
     timerQueries: !!gl.getExtension("EXT_disjoint_timer_query_webgl2"),
@@ -67,6 +85,8 @@ async function measure(options) {
   setup(options);
   running = true;
   const interrupt = () => { interrupted = true; };
+  const pixelRatioQuery = window.matchMedia(`(resolution: ${devicePixelRatio}dppx)`);
+  pixelRatioQuery.addEventListener("change", interrupt);
   window.addEventListener("resize", interrupt);
   document.addEventListener("visibilitychange", interrupt);
   app.renderer.domElement.addEventListener("webglcontextlost", interrupt);
@@ -132,6 +152,7 @@ async function measure(options) {
     pending.forEach(q => gl.deleteQuery(q));
     observer?.disconnect();
     window.removeEventListener("resize", interrupt);
+    pixelRatioQuery.removeEventListener("change", interrupt);
     document.removeEventListener("visibilitychange", interrupt);
     app.renderer.domElement.removeEventListener("webglcontextlost", interrupt);
     interrupted = false;

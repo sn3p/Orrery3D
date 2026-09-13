@@ -100,8 +100,9 @@ installs locked dependencies with the Node.js version in `.nvmrc`, builds a clea
 `dist/` from source, and runs the full browser suite in separate Chrome, Firefox
 and WebKit jobs. Deployment requires the build and all three browser checks to
 pass. Pull requests targeting `master` run the same checks without deploying.
-Linux Firefox runs with a virtual display because its headless mode does not
-provide the WebGL 2 context required by this suite.
+Linux Chrome and Firefox run with a virtual display. Chrome avoids intermittent
+headless surface-capture failures; Firefox's headless mode does not provide the
+WebGL 2 context required by this suite.
 Linux CI uses Mesa software GL (Chrome selects ANGLE's OpenGL backend). SwiftShader's
 trigonometric approximations exceed the existing orbital-error bound; the suite
 keeps the same shader and accuracy thresholds on the selected CI backend. Reports
@@ -156,7 +157,11 @@ Asteroid positions and discovery colours are calculated in a vertex shader withi
 
 Each planet caches its fixed orbital basis and ellipse scale, updating its existing position vector each frame. Changes to its orbital elements rebuild that cache. Orbit tracks reuse the same prepared calculations across their samples. The Sun and planets share sphere construction while keeping separate geometry and material ownership.
 
+Click **[+] options** in the top-right corner to open the speed and rendering controls. The panel starts closed; click **[-] options**, click outside, or press Escape to close it without changing your settings.
+
 Playback follows elapsed time: speed `1` means 60 simulated days per second, `0` pauses, and negative speeds reverse. The default `1.5` preserves the old pace at 60 FPS. Hidden tabs and lost graphics contexts pause playback.
+
+Rendering starts at **1×** on every load for a softer appearance. When the display/browser pixel ratio is at least 2×, the **DPR** control offers **1×** and **2×**; 2× adds detail and graphics work. The choice lasts for the current page and resets to 1× on reload, ignoring earlier saved preferences. Below a display ratio of 2×, the control is hidden and rendering falls back to 1× (capped at the display ratio below 1×). Returning to a display ratio of at least 2× restores the current page's choice. Benchmarks use their own requested DPR.
 
 At speed `0`, the scene renders only when the camera, date, catalogue or viewport changes, or graphics reconnect. The readout shows `0 FPS` while paused. Resuming playback excludes time spent paused or disconnected.
 

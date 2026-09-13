@@ -3,6 +3,13 @@ const fs = require("node:fs");
 const path = require("node:path");
 const Diagnostics = require("./diagnostics.cjs");
 
+function screenshotEvent(events) {
+  const screenshot = events.find(event => event.type === "screenshot");
+  assert(screenshot, `Expected a screenshot before cleanup; capture errors: ${JSON.stringify(
+    events.filter(event => event.type === "capture-error"))}`);
+  return screenshot;
+}
+
 module.exports = async (browser, output, name) => {
   const directory = path.join(output, `${name}-expected-diagnostic-failure`);
   const report = new Diagnostics(directory);
@@ -36,7 +43,7 @@ module.exports = async (browser, output, name) => {
     assert(events.some(event => event.type === "console" && event.text === "Expected diagnostic console error"));
     assert(events.some(event => event.type === "pageerror" && event.message === "Expected diagnostic page error"));
     assert(events.some(event => event.type === "requestfailed"));
-    const screenshot = events.find(event => event.type === "screenshot");
+    const screenshot = screenshotEvent(events);
     assert.equal(screenshot.reason, "closed", "Helper evidence precedes finally cleanup");
     assert(fs.statSync(path.join(directory, screenshot.filename)).size > 100);
     assert.deepEqual(JSON.parse(fs.readFileSync(path.join(directory, "results.json"))),
@@ -54,5 +61,39 @@ module.exports = async (browser, output, name) => {
   assert.match(captureLog, /capture-error/);
   assert.equal(report.run.error.stack, failure.stack);
 
-  return { helperFailure: "passed", consoleAndPageErrors: "passed", requestFailure: "passed", captureFailure: "passed" };
+  assert.throws(() => screenshotEvent(captureLog.trim().split("\n").map(line => JSON.parse(line))),
+    error => error instanceof assert.AssertionError && /Expected unavailable screenshot/.test(error.message),
+    "Missing screenshot evidence reports the capture error instead of throwing a TypeError");
+
+  // Exercise the real screenshot API beyond the former five-second deadline.
+  // A pending font makes the delay deterministic without stubbing screenshots.
+  const slow = await observed.newPage({ viewport: { width: 320, height: 240 } });
+  let releaseFont;
+  const fontReady = new Promise(resolve => { releaseFont = resolve; });
+  let releaseTimer;
+  try {
+    await slow.route("https://diagnostics.invalid/font.woff2", async route => {
+      await fontReady;
+      await route.fulfill({ path: path.join(__dirname, "../src/fonts/JetBrainsMono-Variable.woff2"),
+        contentType: "font/woff2", headers: { "access-control-allow-origin": "*" } });
+    });
+    const requested = slow.waitForRequest("https://diagnostics.invalid/font.woff2");
+    await slow.setContent(`<style>@font-face { font-family: diagnostic; src: url("https://diagnostics.invalid/font.woff2"); }
+      p { font-family: diagnostic; }</style><p>Slow capture evidence</p>`, { waitUntil: "domcontentloaded" });
+    await requested;
+    releaseTimer = setTimeout(releaseFont, 5500);
+    await slow.close();
+  } finally {
+    clearTimeout(releaseTimer);
+    releaseFont();
+    if (!slow.isClosed()) await slow.close();
+  }
+  const slowEvents = fs.readFileSync(path.join(directory, `${name}-page-3.jsonl`), "utf8")
+    .trim().split("\n").map(line => JSON.parse(line));
+  const slowScreenshot = screenshotEvent(slowEvents);
+  assert.equal(slowScreenshot.reason, "closed");
+  assert(fs.statSync(path.join(directory, slowScreenshot.filename)).size > 100);
+
+  return { helperFailure: "passed", consoleAndPageErrors: "passed", requestFailure: "passed",
+    captureFailure: "passed", slowCapture: "passed" };
 };

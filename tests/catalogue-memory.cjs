@@ -27,6 +27,7 @@ module.exports = async (browser, url) => {
       if (navigation === "boot") await page.goto(url);
       else await page.reload();
       await page.waitForFunction(() => Number(document.querySelector("#orrery-count").textContent) > 0);
+      await require("./options.cjs").openOptions(page);
       const speed = page.getByRole("textbox", { name: "Playback speed" });
       await speed.fill("0"); await speed.press("Enter");
       await page.waitForFunction(() => document.querySelector("#orrery-fps").textContent === "0 FPS");
