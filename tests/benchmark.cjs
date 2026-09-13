@@ -11,6 +11,7 @@ module.exports = async function testBenchmark(browser, output, name) {
   page.on("console", message => { if (message.type() === "error") errors.push(message.text()); });
   try {
     await page.goto(url); await page.evaluate(() => window.benchmark.ready);
+    const highDpi = await require("./high-dpi.cjs").testBenchmarkDpr(page, name);
     const frames = await page.evaluate(() => window.benchmarkProbe.verify());
     assert.deepEqual(frames.steps, [1.5, 0, -1.5]);
     assert.equal(frames.drawsAfterCompletion, 0);
@@ -39,7 +40,7 @@ module.exports = async function testBenchmark(browser, output, name) {
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth), 390);
     await page.screenshot({ path: path.join(output, `${name}-benchmark-narrow.png`) });
     assert.deepEqual(errors, []);
-    return { ...frames, interruptionRecoveryAndDownload: "passed" };
+    return { highDpi, ...frames, interruptionRecoveryAndDownload: "passed" };
   } finally {
     await page.close();
     await new Promise(resolve => server.close(resolve));

@@ -37,6 +37,7 @@ export default class Orrery3D {
 
     document.addEventListener("visibilitychange", this.onVisibilityChange);
     window.addEventListener("resize", this.resize);
+    this.watchPixelRatio();
     this.setStatus(this.statusMessage);
 
     // Start rendering
@@ -226,6 +227,20 @@ export default class Orrery3D {
     this.gui.update();
   }
 
+  watchPixelRatio() {
+    this.pixelRatioQuery?.removeEventListener("change", this.onPixelRatioChange);
+    this.pixelRatioQuery = window.matchMedia(`(resolution: ${window.devicePixelRatio}dppx)`);
+    this.pixelRatioQuery.addEventListener("change", this.onPixelRatioChange);
+  }
+
+  onPixelRatioChange = () => {
+    if (this.disposed) return;
+    // Display/zoom changes can alter DPR without changing the CSS viewport.
+    // Rearm at the new resolution, including while paused, without polling.
+    this.watchPixelRatio();
+    this.resize();
+  };
+
   resize = () => {
     this.camera.aspect = window.innerWidth / window.innerHeight;
     this.camera.updateProjectionMatrix();
@@ -241,6 +256,7 @@ export default class Orrery3D {
     this.cancelRender();
     document.removeEventListener("visibilitychange", this.onVisibilityChange);
     window.removeEventListener("resize", this.resize);
+    this.pixelRatioQuery.removeEventListener("change", this.onPixelRatioChange);
     this.renderer.domElement.removeEventListener("webglcontextlost", this.onContextLost);
     this.renderer.domElement.removeEventListener("webglcontextrestored", this.onContextRestored);
     this.controls.removeEventListener("change", this.requestRender);

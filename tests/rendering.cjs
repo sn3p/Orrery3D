@@ -171,6 +171,7 @@ exports.testProductionInteractions = async (browser, url, output, name) => {
   page.on("pageerror", error => errors.push(error.message));
   page.on("console", message => { if (message.type() === "error") errors.push(message.text()); });
   try {
+    await require("./high-dpi.cjs").installDprProbe(page);
     await page.goto(url);
     await page.waitForFunction(() => Number(document.querySelector("#orrery-count").textContent) > 0);
     const speed = page.getByRole("textbox", { name: "Playback speed" });
@@ -193,6 +194,7 @@ exports.testProductionInteractions = async (browser, url, output, name) => {
       assert.equal(await page.locator("#orrery-fps").textContent(), "0 FPS");
     };
     await checkIdle();
+    const highDpi = await require("./high-dpi.cjs").testProductionDpr(page, name);
     const date = await page.locator("#orrery-date").textContent();
     await speed.fill("1.5"); await speed.press("Enter");
     await page.waitForFunction(date => document.querySelector("#orrery-date").textContent > date, date);
@@ -239,7 +241,7 @@ exports.testProductionInteractions = async (browser, url, output, name) => {
     }
     await page.screenshot({ path: path.join(output, `${name}-paused-production-narrow.png`) });
     assert.deepEqual(errors, []);
-    return { idleDraws: 0, desktopAndRetinaNarrow: "passed", rotationPanZoom: "passed",
+    return { highDpi, idleDraws: 0, desktopAndRetinaNarrow: "passed", rotationPanZoom: "passed",
       touch: name === "chromium" ? "native one/two-finger input passed" : "not exercised" };
   } finally { await page.close(); }
 };
