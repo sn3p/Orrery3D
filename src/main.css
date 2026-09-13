@@ -77,14 +77,16 @@ dat.GUI overrides
   background: black;
   color: #999;
   font: inherit;
-  font-size: 12px;
   line-height: 18px;
+  word-spacing: -0.3em;
   cursor: pointer;
 }
 
 .orrery-options-indicator {
   display: inline-block;
-  transform: translateY(1px);
+  font-size: 10px;
+  line-height: 1;
+  vertical-align: 1px;
 }
 
 .orrery-options-trigger:hover {

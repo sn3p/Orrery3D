@@ -33,9 +33,22 @@ exports.testOptions = async (browser, url, output, name) => {
     assert.equal(await trigger.getAttribute("aria-expanded"), "true");
     assert.equal(await trigger.textContent(), "[-] options");
     assert.deepEqual(await trigger.boundingBox(), closedTrigger, "Toggle stays aligned when opening the panel");
-    assert(await trigger.evaluate(el => parseFloat(getComputedStyle(el).fontSize)
-      < parseFloat(getComputedStyle(document.querySelector(".dg .property-name")).fontSize)),
-    "Options toggle is smaller than the control labels");
+    const toggleStyle = await trigger.evaluate(el => {
+      const indicator = el.querySelector(".orrery-options-indicator");
+      const word = document.createRange();
+      word.setStart(el.lastChild, 1);
+      word.setEnd(el.lastChild, el.lastChild.length);
+      return {
+        textSize: parseFloat(getComputedStyle(el).fontSize),
+        labelSize: parseFloat(getComputedStyle(document.querySelector(".dg .property-name")).fontSize),
+        indicatorSize: parseFloat(getComputedStyle(indicator).fontSize),
+        gap: word.getBoundingClientRect().left - indicator.getBoundingClientRect().right,
+      };
+    });
+    assert.equal(toggleStyle.textSize, toggleStyle.labelSize, "Options keeps the original label size");
+    assert(toggleStyle.indicatorSize < toggleStyle.textSize, "Only the marker is smaller");
+    assert(toggleStyle.gap > 0 && toggleStyle.gap < toggleStyle.textSize * 0.4,
+      "Marker and word have a compact positive gap");
     assert(await speed.evaluate(el => el === document.activeElement), "Opening moves focus to the first control");
     assert.match(await page.locator("#" + await speed.getAttribute("aria-describedby")).textContent(), /0 pauses/);
     assert.match(await page.locator("#" + await dpr.getAttribute("aria-describedby")).textContent(), /Lower DPR/);
