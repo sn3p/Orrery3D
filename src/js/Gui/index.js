@@ -26,7 +26,7 @@ export default class Gui {
     this.trigger = document.createElement("button");
     this.trigger.type = "button";
     this.trigger.className = "orrery-options-trigger";
-    this.trigger.textContent = "options";
+    this.trigger.textContent = "[+] options";
     this.trigger.setAttribute("aria-label", "Options");
     this.trigger.setAttribute("aria-expanded", "false");
     this.panel = document.createElement("section");
@@ -68,6 +68,7 @@ export default class Gui {
   setOpen(open, restoreFocus = true) {
     const hadFocus = this.panel.contains(document.activeElement);
     this.panel.hidden = !open;
+    this.trigger.textContent = open ? "[-] options" : "[+] options";
     this.trigger.setAttribute("aria-expanded", String(open));
     if (open) this.gui.domElement.querySelector("input").focus();
     else if (restoreFocus && hadFocus) this.trigger.focus();

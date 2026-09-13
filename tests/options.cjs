@@ -19,6 +19,7 @@ exports.testOptions = async (browser, url, output, name) => {
     await page.goto(url);
     await page.waitForFunction(() => Number(document.querySelector("#orrery-count").textContent) > 0);
     assert.equal(await trigger.count(), 1, "Production has an options trigger");
+    assert.equal(await trigger.textContent(), "[+] options");
     assert(await panel.isHidden(), "Options start closed");
     assert.equal(await trigger.getAttribute("aria-expanded"), "false");
     assert.equal(await trigger.getAttribute("aria-controls"), await panel.getAttribute("id"));
@@ -28,6 +29,7 @@ exports.testOptions = async (browser, url, output, name) => {
     await trigger.focus(); await trigger.press("Enter");
     assert(await panel.isVisible());
     assert.equal(await trigger.getAttribute("aria-expanded"), "true");
+    assert.equal(await trigger.textContent(), "[-] options");
     assert(await speed.evaluate(el => el === document.activeElement), "Opening moves focus to the first control");
     assert.match(await page.locator("#" + await speed.getAttribute("aria-describedby")).textContent(), /0 pauses/);
     assert.match(await page.locator("#" + await dpr.getAttribute("aria-describedby")).textContent(), /Lower DPR/);
@@ -62,11 +64,13 @@ exports.testOptions = async (browser, url, output, name) => {
     const date = await page.locator("#orrery-date").textContent();
     await speed.press("Enter"); await page.keyboard.press("Escape");
     assert(await panel.isHidden());
+    assert.equal(await trigger.textContent(), "[+] options");
     assert(await trigger.evaluate(el => el === document.activeElement), "Escape returns focus to the trigger");
     await trigger.press("Tab");
     assert(await page.evaluate(() => !document.activeElement.closest(".orrery-options-panel")), "Tab skips closed controls");
     await trigger.focus(); await trigger.press("Space");
     assert(await panel.isVisible(), "Space opens the panel");
+    assert.equal(await trigger.textContent(), "[-] options");
     assert.equal(await speed.inputValue(), "0");
     assert.equal(await dpr.inputValue(), "1");
     await page.waitForTimeout(100);
@@ -75,8 +79,10 @@ exports.testOptions = async (browser, url, output, name) => {
     await page.screenshot({ path: path.join(output, `${name}-options-open-desktop.png`) });
 
     await trigger.click(); assert(await panel.isHidden(), "Trigger toggles the panel closed");
+    assert.equal(await trigger.textContent(), "[+] options");
     await trigger.click(); await page.mouse.click(50, 150);
     assert(await panel.isHidden(), "An outside pointer closes the panel");
+    assert.equal(await trigger.textContent(), "[+] options");
     await exports.openOptions(page);
     for (const viewport of [{ width: 390, height: 844 }, { width: 320, height: 240 }]) {
       await page.setViewportSize(viewport);
@@ -104,6 +110,7 @@ exports.testOptions = async (browser, url, output, name) => {
     await page.reload();
     await page.waitForFunction(() => Number(document.querySelector("#orrery-count").textContent) > 0);
     assert(await panel.isHidden(), "Reload starts with a closed panel");
+    assert.equal(await trigger.textContent(), "[+] options");
     await exports.openOptions(page);
     assert.equal(await dpr.inputValue(), "1", "Panel visibility does not change persisted DPR");
     assert.deepEqual(errors, []);

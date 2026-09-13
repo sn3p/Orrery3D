@@ -157,7 +157,7 @@ Asteroid positions and discovery colours are calculated in a vertex shader withi
 
 Each planet caches its fixed orbital basis and ellipse scale, updating its existing position vector each frame. Changes to its orbital elements rebuild that cache. Orbit tracks reuse the same prepared calculations across their samples. The Sun and planets share sphere construction while keeping separate geometry and material ownership.
 
-Click **options** in the top-right corner to open the speed and rendering controls. The panel starts closed; click options again, click outside, or press Escape to close it without changing your settings.
+Click **[+] options** in the top-right corner to open the speed and rendering controls. The panel starts closed; click **[-] options**, click outside, or press Escape to close it without changing your settings.
 
 Playback follows elapsed time: speed `1` means 60 simulated days per second, `0` pauses, and negative speeds reverse. The default `1.5` preserves the old pace at 60 FPS. Hidden tabs and lost graphics contexts pause playback.
 
