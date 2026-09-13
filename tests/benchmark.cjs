@@ -10,7 +10,10 @@ module.exports = async function testBenchmark(browser, output, name) {
   page.on("pageerror", error => errors.push(error.message));
   page.on("console", message => { if (message.type() === "error") errors.push(message.text()); });
   try {
+    await page.addInitScript(() => localStorage.setItem("orrery3d.pixelRatio", "1"));
     await page.goto(url); await page.evaluate(() => window.benchmark.ready);
+    assert.equal(await page.evaluate(() => document.querySelector("canvas").width), 1600,
+      "Benchmark preview ignores the app's saved DPR choice");
     const highDpi = await require("./high-dpi.cjs").testBenchmarkDpr(page, name);
     const frames = await page.evaluate(() => window.benchmarkProbe.verify());
     assert.deepEqual(frames.steps, [1.5, 0, -1.5]);

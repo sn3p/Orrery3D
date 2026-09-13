@@ -25,7 +25,7 @@ exports.installDprProbe = page => page.addInitScript(() => {
     return result;
   };
 });
-const deliverDprChanges = page => page.evaluate(() => {
+const deliverDprChanges = exports.deliverDprChanges = page => page.evaluate(() => {
   for (const [query, previous] of [...window.dpiQueries]) {
     if (query.matches === previous) continue;
     window.dpiQueries.set(query, query.matches);

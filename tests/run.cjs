@@ -328,6 +328,8 @@ async function main() {
         assert.deepEqual(errors, []);
         await require("./rendering.cjs").testPausedLoading(page, url + "/production/");
         result.productionInteractions = await require("./rendering.cjs").testProductionInteractions(browser, url + "/production/", output, name);
+        diagnostics.stage(`${name}: production DPR options`);
+        result.pixelRatioOptions = await require("./pixel-ratio.cjs")(browser, url + "/production/", output, name);
         assert.deepEqual(errors, []);
         result.catalogueLoading = await require("./catalogue-preparation.cjs").testLoading(browser, url + "/production/");
         diagnostics.stage(`${name}: expected loading and WebGL errors`);

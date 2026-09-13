@@ -122,3 +122,21 @@ dat.GUI overrides
 .dg .c:hover input {
   color: #999 !important;
 }
+
+.dg .c select {
+  font-family: var(--font-ui);
+  font-size: 12px;
+  color: #999;
+  background: #151515;
+  color-scheme: dark;
+  border: 0;
+  border-radius: 0;
+  height: 19px;
+  margin: 4px 0;
+  width: 100%;
+}
+
+.dg .c select:focus-visible {
+  outline: 1px solid #999;
+  outline-offset: 1px;
+}

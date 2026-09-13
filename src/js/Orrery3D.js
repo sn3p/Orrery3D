@@ -10,11 +10,20 @@ import Asteroids from "./Asteroids";
 import { prepareCatalogue } from "./prepareCatalogue";
 import PlaybackClock from "./PlaybackClock";
 
+const pixelRatioKey = "orrery3d.pixelRatio";
+const pixelRatioChoice = value => ["1", "2", "3"].includes(value) ? value : "auto";
+
 export default class Orrery3D {
   constructor(options = {}) {
     this.container = options.container || document.body;
     this.startDate = options.startDate || new Date(1980, 1);
     this._jedDelta = options.jedDelta ?? 1.5;
+    this.rememberPixelRatio = options.rememberPixelRatio ?? true;
+    this._pixelRatio = "auto";
+    if (this.rememberPixelRatio) {
+      try { this._pixelRatio = pixelRatioChoice(localStorage.getItem(pixelRatioKey)); }
+      catch { /* Storage may be unavailable; keep the display default. */ }
+    }
     this.asteroidColor = new THREE.Color(options.asteroidColor ?? 0x999999);
     this.asteroidDiscoveryColor = new THREE.Color(options.asteroidDiscoveryColor ?? 0x00ff00);
     this.asteroidDiscoveryDuration = options.asteroidDiscoveryDuration ?? 200; // in Julian days
@@ -64,6 +73,26 @@ export default class Orrery3D {
 
   get isPlaying() { return Number.isFinite(this.jedDelta) && this.jedDelta !== 0; }
 
+  get pixelRatio() { return this._pixelRatio; }
+
+  set pixelRatio(value) {
+    const ratio = pixelRatioChoice(value);
+    if (ratio === this._pixelRatio || this.disposed) return;
+    this._pixelRatio = ratio;
+    if (this.rememberPixelRatio) {
+      try {
+        if (ratio === "auto") localStorage.removeItem(pixelRatioKey);
+        else localStorage.setItem(pixelRatioKey, ratio);
+      } catch { /* The choice still works for this session when storage is blocked. */ }
+    }
+    this.resize();
+  }
+
+  get effectivePixelRatio() {
+    return this.pixelRatio === "auto" ? window.devicePixelRatio
+      : Math.min(Number(this.pixelRatio), window.devicePixelRatio);
+  }
+
   createSystem() {
     // Create scene
     this.scene = new THREE.Scene();
@@ -72,7 +101,7 @@ export default class Orrery3D {
     this.renderer = new THREE.WebGLRenderer({
       antialias: true,
     });
-    this.renderer.setPixelRatio(window.devicePixelRatio);
+    this.renderer.setPixelRatio(this.effectivePixelRatio);
     this.renderer.setSize(window.innerWidth, window.innerHeight);
     this.renderer.setClearColor(0x000000, 1);
 
@@ -245,8 +274,9 @@ export default class Orrery3D {
     this.camera.aspect = window.innerWidth / window.innerHeight;
     this.camera.updateProjectionMatrix();
 
-    this.renderer.setPixelRatio(window.devicePixelRatio);
+    this.renderer.setPixelRatio(this.effectivePixelRatio);
     this.renderer.setSize(window.innerWidth, window.innerHeight);
+    this.gui?.updatePixelRatio();
     this.requestRender();
   };
 
