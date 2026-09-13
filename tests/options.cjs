@@ -65,6 +65,10 @@ exports.testOptions = async (browser, url, output, name) => {
     await exports.openOptions(page);
     for (const viewport of [{ width: 390, height: 844 }, { width: 320, height: 240 }]) {
       await page.setViewportSize(viewport);
+      await page.waitForFunction(({ width, height }) => {
+        const canvas = document.querySelector("canvas");
+        return canvas.clientWidth === width && canvas.clientHeight === height;
+      }, viewport);
       const bounds = await panel.boundingBox();
       assert(bounds.x >= 0 && bounds.y >= 0 && bounds.x + bounds.width <= viewport.width
         && bounds.y + bounds.height <= viewport.height, "Options fit narrow and short viewports");
