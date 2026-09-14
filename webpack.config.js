@@ -1,4 +1,5 @@
 const path = require("path");
+const webpack = require("webpack");
 const MiniCssExtractPlugin = require("mini-css-extract-plugin");
 const HtmlWebpackPlugin = require("html-webpack-plugin");
 const TerserPlugin = require("terser-webpack-plugin");
@@ -47,6 +48,7 @@ module.exports = {
     ],
   },
   plugins: [
+    new webpack.DefinePlugin({ __CATALOG_TRIAL__: "null" }),
     new MiniCssExtractPlugin({ filename: "[name].css" }),
     new HtmlWebpackPlugin({
       inject: false,

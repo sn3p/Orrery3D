@@ -63,6 +63,8 @@ async function main() {
   await build("./tests/browser.js", path.join(buildOutput, "fixture"));
   diagnostics.stage("build production app");
   await build("./src/index.js", path.join(buildOutput, "production"));
+  diagnostics.stage("build catalog adapter trials");
+  await require("./catalog-loading.cjs").build(buildOutput);
   const server = http.createServer((req, res) => {
     const pathname = new URL(req.url, "http://localhost").pathname;
     if (pathname.endsWith("/favicon.ico")) { res.writeHead(204); res.end(); return; }
@@ -87,6 +89,8 @@ async function main() {
         diagnostics.stage(`${name}: diagnostic failure regressions`);
         const diagnosticChecks = await require("./diagnostics-regression.cjs")(instance, output, name);
         const browser = diagnostics.browser(instance, name);
+        diagnostics.stage(name + ": catalog adapter lifecycle");
+        const catalogLoading = await require("./catalog-loading.cjs").run(browser, url, output, name);
         diagnostics.stage(`${name}: WebGL 2 capability`);
         const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
         const graphics = await page.evaluate(() => {
@@ -238,6 +242,8 @@ async function main() {
           app.gui.gui.updateDisplay();
           return { timing, catalog: catalog.length, fresh, faded, instant, hidden };
         });
+        await require("./catalog-review.cjs").runNative(browser, url, output, name);
+        result.catalogLoading = catalogLoading;
         result.sharedFrames = sharedFrames;
         result.fps = fps;
         result.pausedRendering = pausedRendering;
@@ -254,7 +260,19 @@ async function main() {
         result.pausedLifecycle = pausedLifecycle;
         result.catalogueReplacement = catalogueReplacement;
         result.phaseUploads = phaseUploads;
-        result.shader = await page.evaluate(() => window.test.validateShader(window.test.app, window.test.catalog));
+        result.shader = await page.evaluate(() => {
+          const contexts = new Set(), original = HTMLCanvasElement.prototype.getContext;
+          HTMLCanvasElement.prototype.getContext = function(type, ...args) {
+            const context = original.call(this, type, ...args);
+            if (type === "webgl2" && context) contexts.add(context);
+            return context;
+          };
+          try {
+            const result = window.test.validateShader(window.test.app, window.test.catalog);
+            if (contexts.size !== 1) throw new Error("Shader validation must reuse one native context.");
+            return result;
+          } finally { HTMLCanvasElement.prototype.getContext = original; }
+        });
         diagnostics.stage(`${name}: controls, layout and context recovery`);
         await require("./options.cjs").openOptions(page);
         const speed = page.getByRole("textbox", { name: "Playback speed" });

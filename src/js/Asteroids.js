@@ -28,7 +28,7 @@ export const orbitGLSL = `
 `;
 
 export default class Asteroids extends THREE.Points {
-  constructor(packed, { jed, color, discoveryColor, discoveryDuration }) {
+  constructor(packed, { jed, color, discoveryColor, discoveryDuration, committedCount = packed.dates.length }) {
     if (!Number.isFinite(jed) || !Number.isFinite(discoveryDuration) || discoveryDuration < 0) {
       throw new Error("Invalid asteroid date or discovery duration.");
     }
@@ -74,8 +74,30 @@ export default class Asteroids extends THREE.Points {
     this.discoveryDates = packed.dates;
     this.phases = packed.phases;
     this.epoch = packed.epoch;
+    this.committedCount = committedCount;
     this.uniforms = uniforms;
     this.update(jed);
+  }
+
+  append(packed, start) {
+    const end = start + packed.dates.length;
+    if (start !== this.committedCount || end > this.discoveryDates.length || packed.epoch !== this.epoch
+      || (start && packed.dates.length && packed.dates[0] < this.discoveryDates[start - 1])) {
+      throw new Error("Invalid incremental catalogue commitment.");
+    }
+    const arrays = { position: packed.p, basisQ: packed.q, elements: packed.elements,
+      meanAnomaly: packed.meanAnomalies, discovery: packed.discovery };
+    for (const [name, values] of Object.entries(arrays)) {
+      const attribute = this.geometry.attributes[name];
+      const offset = start * attribute.itemSize;
+      attribute.array.set(values, offset);
+      attribute.addUpdateRange(offset, values.length);
+      attribute.needsUpdate = true;
+    }
+    this.discoveryDates.set(packed.dates, start);
+    this.phases.set(packed.phases, start * 2);
+    this.geometry.boundingSphere.radius = Math.max(this.geometry.boundingSphere.radius, packed.radius * 1.00001 + 1);
+    this.committedCount = end;
   }
 
   update(jed) {
@@ -84,15 +106,18 @@ export default class Asteroids extends THREE.Points {
       // An occasional phase refresh bounds Float32 time error during long
       // playback and date jumps. Ordinary frames change only uniforms/range.
       const meanAnomaly = this.geometry.attributes.meanAnomaly;
-      for (let i = 0; i < this.discoveryDates.length; i++) {
+      for (let i = 0; i < this.committedCount; i++) {
         meanAnomaly.array[i] = wrapPhase(this.phases[i * 2] + this.phases[i * 2 + 1] * (jed - REFERENCE_JED));
       }
-      meanAnomaly.needsUpdate = true;
+      if (this.committedCount) {
+        meanAnomaly.addUpdateRange(0, this.committedCount);
+        meanAnomaly.needsUpdate = true;
+      }
       this.epoch = jed;
     }
     this.uniforms.orbitTime.value = jed - this.epoch;
     this.uniforms.discoveryTime.value = jed - REFERENCE_JED;
-    let lo = 0, hi = this.discoveryDates.length;
+    let lo = 0, hi = this.committedCount;
     while (lo < hi) {
       const mid = (lo + hi) >>> 1;
       if (this.discoveryDates[mid] <= jed) lo = mid + 1;

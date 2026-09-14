@@ -9,59 +9,64 @@ function assert(condition, message) { if (!condition) throw new Error(message); 
 
 // Read back the production GLSL and packed attributes independently of Three's
 // shader injection. Pixel checks below also exercise the real PointsMaterial.
-function transformFeedback(packed, dates, epoch = REFERENCE_JED) {
+function transformFeedback(gl, packed, dates, epoch = REFERENCE_JED) {
   // Execute the same orbit/colour GLSL on the GPU, and read the result back only
   // in validation, never in the performance loop.
-  const canvas = document.createElement("canvas");
-  const gl = canvas.getContext("webgl2");
-  assert(gl, "WebGL 2 is required for shader checks");
   const program = gl.createProgram();
-  const vs = `#version 300 es
-    precision highp float;
-    in vec3 p; in vec3 q; in vec2 elements; in float meanAnomaly; in float discovery;
-    uniform float time; uniform float discoveryTime; out vec3 positionOut; out vec3 colorOut;
-    ${orbitGLSL}
-    void main() {
-      positionOut = orbitPosition(p, q, elements, meanAnomaly, time);
-      colorOut = discoveryColor(discoveryTime, discovery, 200.0, vec3(0,1,0), vec3(${oldColor.r}));
-      gl_Position = vec4(positionOut, 1); gl_PointSize = 1.0;
-    }`;
+  const vao = gl.createVertexArray();
+  const sourceBuffer = gl.createBuffer();
+  const feedback = gl.createTransformFeedback();
+  const destination = gl.createBuffer();
   const shaders = [];
-  for (const [type, source] of [[gl.VERTEX_SHADER, vs], [gl.FRAGMENT_SHADER, "#version 300 es\nprecision highp float; out vec4 c; void main(){c=vec4(1);}"]]) {
-    const shader = gl.createShader(type); gl.shaderSource(shader, source); gl.compileShader(shader);
-    assert(gl.getShaderParameter(shader, gl.COMPILE_STATUS), gl.getShaderInfoLog(shader));
-    gl.attachShader(program, shader); shaders.push(shader);
+  try {
+    const vs = `#version 300 es
+      precision highp float;
+      in vec3 p; in vec3 q; in vec2 elements; in float meanAnomaly; in float discovery;
+      uniform float time; uniform float discoveryTime; out vec3 positionOut; out vec3 colorOut;
+      ${orbitGLSL}
+      void main() {
+        positionOut = orbitPosition(p, q, elements, meanAnomaly, time);
+        colorOut = discoveryColor(discoveryTime, discovery, 200.0, vec3(0,1,0), vec3(${oldColor.r}));
+        gl_Position = vec4(positionOut, 1); gl_PointSize = 1.0;
+      }`;
+    for (const [type, source] of [[gl.VERTEX_SHADER, vs], [gl.FRAGMENT_SHADER, "#version 300 es\nprecision highp float; out vec4 c; void main(){c=vec4(1);}"]]) {
+      const shader = gl.createShader(type); shaders.push(shader);
+      gl.shaderSource(shader, source); gl.compileShader(shader);
+      assert(gl.getShaderParameter(shader, gl.COMPILE_STATUS), gl.getShaderInfoLog(shader));
+      gl.attachShader(program, shader);
+    }
+    gl.transformFeedbackVaryings(program, ["positionOut", "colorOut"], gl.INTERLEAVED_ATTRIBS);
+    gl.linkProgram(program); assert(gl.getProgramParameter(program, gl.LINK_STATUS), gl.getProgramInfoLog(program));
+    gl.useProgram(program);
+    gl.bindVertexArray(vao);
+    gl.bindBuffer(gl.ARRAY_BUFFER, sourceBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(packed), gl.STATIC_DRAW);
+    for (const [name, size, offset] of [["p", 3, 0], ["q", 3, 3], ["elements", 2, 6], ["meanAnomaly", 1, 8], ["discovery", 1, 9]]) {
+      const location = gl.getAttribLocation(program, name); gl.enableVertexAttribArray(location);
+      gl.vertexAttribPointer(location, size, gl.FLOAT, false, 40, offset * 4);
+    }
+    const count = packed.length / 10;
+    gl.bindTransformFeedback(gl.TRANSFORM_FEEDBACK, feedback);
+    gl.bindBuffer(gl.TRANSFORM_FEEDBACK_BUFFER, destination);
+    gl.bufferData(gl.TRANSFORM_FEEDBACK_BUFFER, count * 6 * 4, gl.STREAM_READ);
+    gl.bindBufferBase(gl.TRANSFORM_FEEDBACK_BUFFER, 0, destination);
+    gl.enable(gl.RASTERIZER_DISCARD);
+    return dates.map(jed => {
+      gl.uniform1f(gl.getUniformLocation(program, "time"), jed - epoch);
+      gl.uniform1f(gl.getUniformLocation(program, "discoveryTime"), jed - REFERENCE_JED);
+      gl.beginTransformFeedback(gl.POINTS); gl.drawArrays(gl.POINTS, 0, count); gl.endTransformFeedback();
+      const output = new Float32Array(count * 6);
+      gl.getBufferSubData(gl.TRANSFORM_FEEDBACK_BUFFER, 0, output);
+      assert(gl.getError() === gl.NO_ERROR, "Transform feedback WebGL error");
+      return output;
+    });
+  } finally {
+    gl.disable(gl.RASTERIZER_DISCARD); gl.bindTransformFeedback(gl.TRANSFORM_FEEDBACK, null);
+    gl.bindVertexArray(null); gl.bindBuffer(gl.ARRAY_BUFFER, null);
+    gl.bindBuffer(gl.TRANSFORM_FEEDBACK_BUFFER, null); gl.useProgram(null);
+    gl.deleteBuffer(sourceBuffer); gl.deleteBuffer(destination); gl.deleteTransformFeedback(feedback);
+    gl.deleteVertexArray(vao); gl.deleteProgram(program); shaders.forEach(shader => gl.deleteShader(shader));
   }
-  gl.transformFeedbackVaryings(program, ["positionOut", "colorOut"], gl.INTERLEAVED_ATTRIBS);
-  gl.linkProgram(program); assert(gl.getProgramParameter(program, gl.LINK_STATUS), gl.getProgramInfoLog(program));
-  gl.useProgram(program);
-  const vao = gl.createVertexArray(); gl.bindVertexArray(vao);
-  const sourceBuffer = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, sourceBuffer);
-  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(packed), gl.STATIC_DRAW);
-  for (const [name, size, offset] of [["p", 3, 0], ["q", 3, 3], ["elements", 2, 6], ["meanAnomaly", 1, 8], ["discovery", 1, 9]]) {
-    const location = gl.getAttribLocation(program, name); gl.enableVertexAttribArray(location);
-    gl.vertexAttribPointer(location, size, gl.FLOAT, false, 40, offset * 4);
-  }
-  const count = packed.length / 10;
-  const feedback = gl.createTransformFeedback(); gl.bindTransformFeedback(gl.TRANSFORM_FEEDBACK, feedback);
-  const destination = gl.createBuffer(); gl.bindBuffer(gl.TRANSFORM_FEEDBACK_BUFFER, destination);
-  gl.bufferData(gl.TRANSFORM_FEEDBACK_BUFFER, count * 6 * 4, gl.STREAM_READ);
-  gl.bindBufferBase(gl.TRANSFORM_FEEDBACK_BUFFER, 0, destination);
-  gl.enable(gl.RASTERIZER_DISCARD);
-  const results = dates.map(jed => {
-    gl.uniform1f(gl.getUniformLocation(program, "time"), jed - epoch);
-    gl.uniform1f(gl.getUniformLocation(program, "discoveryTime"), jed - REFERENCE_JED);
-    gl.beginTransformFeedback(gl.POINTS); gl.drawArrays(gl.POINTS, 0, count); gl.endTransformFeedback();
-    const output = new Float32Array(count * 6);
-    gl.getBufferSubData(gl.TRANSFORM_FEEDBACK_BUFFER, 0, output);
-    assert(gl.getError() === gl.NO_ERROR, "Transform feedback WebGL error");
-    return output;
-  });
-  gl.disable(gl.RASTERIZER_DISCARD); gl.bindTransformFeedback(gl.TRANSFORM_FEEDBACK, null);
-  gl.deleteBuffer(sourceBuffer); gl.deleteBuffer(destination); gl.deleteTransformFeedback(feedback);
-  gl.deleteVertexArray(vao); gl.deleteProgram(program); shaders.forEach(s => gl.deleteShader(s));
-  gl.getExtension("WEBGL_lose_context")?.loseContext();
-  return results;
 }
 
 function packedAttributes(cloud) {
@@ -77,15 +82,16 @@ function packedAttributes(cloud) {
   return actual;
 }
 
-function validateEccentricOrbits() {
+function validateEccentricOrbits(gl) {
   const data = [0, 0.8, 0.961, 0.99, 0.9999, 0.99999994].flatMap(e =>
     [0, 0.000001, -0.000001, 0.0001, -0.0001, 1, -1, 179.999, -179.999].map(M => ({
       a: 1, e, M, i: 0, W: 0, wbar: 0, n: 1, epoch: REFERENCE_JED, disc: REFERENCE_JED,
     })));
   const cloud = new Asteroids(prepareCatalogue(data, REFERENCE_JED), { jed: REFERENCE_JED, color: oldColor,
     discoveryColor: freshColor, discoveryDuration: 200 });
-  const output = transformFeedback(packedAttributes(cloud), [REFERENCE_JED])[0];
-  cloud.dispose();
+  let output;
+  try { output = transformFeedback(gl, packedAttributes(cloud), [REFERENCE_JED])[0]; }
+  finally { cloud.dispose(); }
   let maxWorldError = 0;
   data.forEach((d, i) => {
     // Independent double-precision bisection: deliberately not the GPU's
@@ -107,6 +113,15 @@ function validateEccentricOrbits() {
 
 
 export function validateShader(app, catalog) {
+  // Reuse one validation context for all dates and edge cases. Losing many
+  // short-lived contexts still depends on GC to free WebKit's context slots.
+  const gl = document.createElement("canvas").getContext("webgl2");
+  assert(gl, "WebGL 2 is required for shader checks");
+  try { return validateShaderWithContext(app, catalog, gl); }
+  finally { if (!gl.isContextLost()) gl.getExtension("WEBGL_lose_context")?.loseContext(); }
+}
+
+function validateShaderWithContext(app, catalog, gl) {
   const dates = [2378861.5, 2444270.5, REFERENCE_JED, REFERENCE_JED + 0.001,
     REFERENCE_JED + REBASE_DAYS - 0.001, REFERENCE_JED + REBASE_DAYS, REFERENCE_JED + REBASE_DAYS + 0.001,
     REFERENCE_JED, REFERENCE_JED - REBASE_DAYS + 0.001, REFERENCE_JED - REBASE_DAYS,
@@ -119,7 +134,7 @@ export function validateShader(app, catalog) {
   try {
     for (const jed of dates) {
       cloud.update(jed);
-      const output = transformFeedback(packedAttributes(cloud), [jed], cloud.epoch)[0];
+      const output = transformFeedback(gl, packedAttributes(cloud), [jed], cloud.epoch)[0];
       for (let i = 0; i < catalog.length; i++) {
         const expected = Orbit.getPosAtTime(catalog[i], jed);
         const error = Math.hypot(...expected.map((v, axis) => v - output[i * 6 + axis]));
@@ -145,7 +160,7 @@ export function validateShader(app, catalog) {
   const single = new Asteroids(prepareCatalogue([sample], options.jed), options);
   const colorDates = [-1, 0, 100, 200, 201, 100, -1, 0, 0, 0.125].map(age => sample.disc + age);
   try {
-    const output = transformFeedback(packedAttributes(single), colorDates);
+    const output = transformFeedback(gl, packedAttributes(single), colorDates);
     colorDates.forEach((jed, t) => {
       const age = Math.max(0, Math.min(1, (jed - sample.disc) / 200));
       for (let axis = 0; axis < 3; axis++) {
@@ -156,7 +171,7 @@ export function validateShader(app, catalog) {
   } finally { single.dispose(); }
   return { cataloguePositionsChecked: catalog.length * dates.length, dates, maxWorldError,
     maxOverviewCssPixelError, colorBoundaryChecks: colorDates.length,
-    eccentricOrbits: validateEccentricOrbits(), rendered: validateRenderedOutput(app, catalog) };
+    eccentricOrbits: validateEccentricOrbits(gl), rendered: validateRenderedOutput(app, catalog) };
 }
 
 // Static test oracle using the project's double-precision orbital model.

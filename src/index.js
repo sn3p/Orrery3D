@@ -8,7 +8,13 @@ const MPC_DATA_URL = catalog;
 export let orrery;
 export const ready = (async () => {
   try {
-    orrery = new Orrery3D({ container: document.getElementById("orrery") });
+    const trial = __CATALOG_TRIAL__;
+    orrery = new Orrery3D({ container: document.getElementById("orrery"),
+      ...(trial ? { startJed: trial.startJed, jedDelta: trial.speed } : {}) });
+    if (trial) {
+      await orrery.loadCatalog({ ...trial.pin, url: new URL(trial.pin.url, document.baseURI).href }, { mode: trial.mode });
+      return orrery;
+    }
     const response = await fetch(MPC_DATA_URL);
     if (!response.ok) throw new Error(`Catalogue request failed: ${response.status}`);
     orrery.setupAsteroids(await response.json());
