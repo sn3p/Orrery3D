@@ -3,6 +3,7 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs/promises");
 const path = require("node:path");
 const http = require("node:http");
+const { createHash } = require("node:crypto");
 const fixtures = path.join(__dirname, "fixtures/browser-v1");
 const collect = async source => {
   const records = [];
@@ -117,4 +118,37 @@ test("latest discovery accepts producer loopback URLs and rejects lookalikes bef
     }
     assert.equal(requested.length, before, "Rejected origins never reach fetch");
   } finally { globalThis.fetch = original; }
+});
+
+test("both producer contracts accept mixed-case source and resolved URL schemes over HTTP", async t => {
+  const { default: Source } = await import("../src/js/catalog/CatalogSource.js");
+  const server = await host(t);
+  const latest = JSON.parse(await fs.readFile(path.join(fixtures, "ties/latest.json")));
+  const browserIndex = JSON.parse(await fs.readFile(path.join(fixtures, "ties", latest.index.url)));
+  const completeRoot = path.join(__dirname, "fixtures/consumer-v1/ties");
+  const completeIndex = JSON.parse(await fs.readFile(path.join(completeRoot, "index.json")));
+  for (const file of await fs.readdir(completeRoot, { recursive: true })) {
+    if (file.endsWith(".json")) server.overrides.set("v1/" + file.split(path.sep).join("/"),
+      { body: await fs.readFile(path.join(completeRoot, file)) });
+  }
+  // The producer accepts case-insensitive schemes in both provenance fields.
+  // Change each field independently so one failure cannot mask the other.
+  for (const field of ["url", "resolved_url"]) for (const scheme of ["HTTPS", "hTtP"]) {
+    for (const mode of ["latest", "indexed", "whole"]) {
+      const index = structuredClone(mode === "latest" ? browserIndex : completeIndex);
+      for (const source of Object.values(index.sources)) {
+        source[field] = source.url.replace(/^[^:]+/, scheme);
+      }
+      const body = Buffer.from(JSON.stringify(index));
+      const sha256 = createHash("sha256").update(body).digest("hex");
+      const pin = { url: mode === "latest" ? `index-${sha256}.json` : "v1/index.json", bytes: body.length, sha256 };
+      server.overrides.set(pin.url, { body });
+      server.overrides.set("latest.json", { body: JSON.stringify({ ...latest, index: pin }) });
+      const source = mode === "latest" ? await Source.openLatest(server.url)
+        : await Source.open({ ...pin, url: new URL(pin.url, server.url).href }, { mode });
+      try {
+        assert.equal((await collect(source)).length, 6, `${mode}: ${field} ${scheme}`);
+      } finally { source.close(); }
+    }
+  }
 });

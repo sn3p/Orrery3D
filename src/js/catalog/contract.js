@@ -93,7 +93,7 @@ function sourceMetadata(source) {
   keys(source, ["url", "retrieved_at", "acquisition", "etag", "last_modified", "content_length",
     "sha256", "bytes", "compression", "decoded"], ["resolved_url"]);
   for (const field of ["url", ...(Object.hasOwn(source, "resolved_url") ? ["resolved_url"] : [])]) {
-    requireValue(typeof source[field] === "string" && !/\s/.test(source[field]) && /^https?:\/\//.test(source[field])
+    requireValue(typeof source[field] === "string" && !/\s/.test(source[field]) && /^https?:\/\//i.test(source[field])
       && !!new URL(source[field]).hostname, "source URL");
   }
   requireValue(["local", "http"].includes(source.acquisition) && ["gzip", "none"].includes(source.compression)
