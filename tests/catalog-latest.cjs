@@ -89,3 +89,32 @@ test("latest discovery fails closed for bad descriptors, payloads and cancelled 
   }
   assert.equal(server.requests.length, requests, "Invalid discovery URLs must not be requested");
 });
+
+test("latest discovery accepts producer loopback URLs and rejects lookalikes before fetching", async t => {
+  const { default: Source } = await import("../src/js/catalog/CatalogSource.js");
+  const server = await host(t), original = globalThis.fetch, requested = [];
+  // Exercise openLatest and its verified HTTP reads without requiring local
+  // interface aliases or DNS for each supported loopback spelling.
+  globalThis.fetch = (value, options) => {
+    const url = new URL(value);
+    requested.push(url.href);
+    return original(new URL(url.pathname + url.search, server.url), options);
+  };
+  try {
+    for (const origin of ["http://localhost", "http://localhost.", "http://LOCALHOST.", "http://127.0.0.0",
+      "http://127.0.0.2", "http://127.255.255.255", "http://127.1", "http://2130706434", "http://[::1]", "https://example.com"]) {
+      const source = await Source.openLatest(origin + "/shared/latest.json");
+      try {
+        assert.equal(new URL(source.url).hostname, new URL(origin).hostname);
+        assert.equal((await collect(source)).length, 6);
+      } finally { source.close(); }
+    }
+    const before = requested.length;
+    for (const origin of ["http://localhost.example", "http://localhost..", "http://127.0.0.2.example",
+      "http://126.255.255.255", "http://128.0.0.0", "http://192.168.1.1", "http://[::2]",
+      "http://[::ffff:127.0.0.1]", "http://user@localhost", "ftp://localhost"]) {
+      await assert.rejects(Source.openLatest(origin + "/shared/latest.json"), /latest URL/);
+    }
+    assert.equal(requested.length, before, "Rejected origins never reach fetch");
+  } finally { globalThis.fetch = original; }
+});

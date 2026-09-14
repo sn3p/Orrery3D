@@ -75,7 +75,8 @@ the dataset nor require a local bundle/cache. The browser requests `latest.json`
 when opened, then the verified index and needed chunks directly from the shared
 host. The build artifact has no historical catalogue or copy of the shared data.
 
-Discovery requires HTTPS; localhost HTTP is allowed for development/tests.
+Discovery requires HTTPS; HTTP is allowed for development on `localhost`,
+`localhost.`, IPv4 loopback `127.0.0.0/8` and IPv6 loopback `[::1]`.
 Credentials, fragments and discovery redirects are rejected. Each new session
 revalidates the descriptor, bounded to 4 KiB, and validates index/chunk lengths,
 hashes, fields and date coverage. Missing/corrupt data uses the existing reload

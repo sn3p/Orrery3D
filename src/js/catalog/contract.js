@@ -81,8 +81,11 @@ export function validateLatest(latest, url) {
 export function validateLatestURL(value) {
   requireValue(typeof value === "string", "latest URL");
   const url = new URL(value);
+  // URL parsing normalizes IPv4 spellings and compressed IPv6 addresses.
+  const loopback = ["localhost", "localhost.", "[::1]"].includes(url.hostname)
+    || /^127(?:\.\d{1,3}){3}$/.test(url.hostname);
   requireValue(!url.username && !url.password && !url.hash && (url.protocol === "https:"
-    || url.protocol === "http:" && ["localhost", "127.0.0.1", "[::1]"].includes(url.hostname)), "latest URL");
+    || url.protocol === "http:" && loopback), "latest URL");
   return url;
 }
 
