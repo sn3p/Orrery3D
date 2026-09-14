@@ -1,4 +1,5 @@
-// App-owned implementation of orrery-data consumer contract v1 (producer f6f4a1d).
+// Reference adapter derived from Orrery3D f8c914c (MIT); see README.md.
+// Preserves indexed v1 and adds the separately versioned browser contract v1.
 export const MAX_INDEX_BYTES = 4 * 1024 * 1024;
 export const MAX_CHUNK_BYTES = 8 * 1024 * 1024;
 const SHA = /^[a-f0-9]{64}$/;
@@ -62,11 +63,37 @@ function payload(ref, url, chunk = false) {
   validateReference(ref.gzip, url + ".gz");
 }
 
+function browserReference(ref, prefix, suffix, chunk = false) {
+  keys(ref, ["url", "bytes", "sha256", ...(chunk ? ["start", "end", "first_disc", "last_disc"] : [])]);
+  validateReference({ url: ref.url, bytes: ref.bytes, sha256: ref.sha256 }, prefix + ref.sha256 + suffix);
+  requireValue(ref.bytes > 0, "payload size");
+}
+
+export function validateLatest(latest, url) {
+  keys(latest, ["browser_contract_version", "index"]);
+  requireValue(latest.browser_contract_version === 1, "latest version");
+  browserReference(latest.index, "index-", ".json");
+  const pin = { ...latest.index, url: new URL(latest.index.url, url).href };
+  validatePin(pin);
+  return pin;
+}
+
+export function validateLatestURL(value) {
+  requireValue(typeof value === "string", "latest URL");
+  const url = new URL(value);
+  // URL parsing normalizes IPv4 spellings and compressed IPv6 addresses.
+  const loopback = ["localhost", "localhost.", "[::1]"].includes(url.hostname)
+    || /^127(?:\.\d{1,3}){3}$/.test(url.hostname);
+  requireValue(!url.username && !url.password && !url.hash && (url.protocol === "https:"
+    || url.protocol === "http:" && loopback), "latest URL");
+  return url;
+}
+
 function sourceMetadata(source) {
   keys(source, ["url", "retrieved_at", "acquisition", "etag", "last_modified", "content_length",
     "sha256", "bytes", "compression", "decoded"], ["resolved_url"]);
   for (const field of ["url", ...(Object.hasOwn(source, "resolved_url") ? ["resolved_url"] : [])]) {
-    requireValue(typeof source[field] === "string" && !/\s/.test(source[field]) && /^https?:\/\//.test(source[field])
+    requireValue(typeof source[field] === "string" && !/\s/.test(source[field]) && /^https?:\/\//i.test(source[field])
       && !!new URL(source[field]).hostname, "source URL");
   }
   requireValue(["local", "http"].includes(source.acquisition) && ["gzip", "none"].includes(source.compression)
@@ -115,9 +142,10 @@ export function dateAt(info, ordinal) {
 }
 
 export function validateIndex(info) {
-  keys(info, ["contract_version", "schema_version", "encoding", "catalog_id", "snapshot_version", "producer",
-    "selection", "counts", "exclusions", "sources", "full", "provenance", "chunk_bytes", "date_counts", "chunks"]);
-  requireValue(info.contract_version === 1 && info.schema_version === 1 && info.encoding === "json-array", "version or encoding");
+  const browser = info?.browser_contract_version === 1;
+  keys(info, [browser ? "browser_contract_version" : "contract_version", "schema_version", "encoding", "catalog_id", "snapshot_version", "producer",
+    "selection", "counts", "exclusions", "sources", ...(!browser ? ["full"] : []), "provenance", "chunk_bytes", "date_counts", "chunks"]);
+  requireValue((browser || info.contract_version === 1) && info.schema_version === 1 && info.encoding === "json-array", "version or encoding");
   requireValue(typeof info.catalog_id === "string" && /^export-v1-[a-f0-9]{64}$/.test(info.catalog_id)
     && typeof info.snapshot_version === "string" && /^snapshot-v1-[a-f0-9]{64}$/.test(info.snapshot_version), "identity");
   keys(info.producer, ["tool_version"]);
@@ -142,10 +170,15 @@ export function validateIndex(info) {
     && x.selection_limit === c.known_discovery - c.discovery_export, "exclusions");
   keys(info.sources, ["mpcorb", "numbered"]);
   Object.values(info.sources).forEach(sourceMetadata);
-  payload(info.full, "full/catalog.json");
-  keys(info.provenance, ["manifest", "master", "header", "notice"]);
-  for (const [key, name] of Object.entries({ manifest: "manifest.json", master: "master.jsonl.gz",
-    header: "MPCORB-header.txt", notice: "NOTICE.txt" })) validateReference(info.provenance[key], "full/" + name);
+  if (browser) {
+    keys(info.provenance, ["header", "notice"]);
+    for (const key of ["header", "notice"]) browserReference(info.provenance[key], key + "-", ".txt");
+  } else {
+    payload(info.full, "full/catalog.json");
+    keys(info.provenance, ["manifest", "master", "header", "notice"]);
+    for (const [key, name] of Object.entries({ manifest: "manifest.json", master: "master.jsonl.gz",
+      header: "MPCORB-header.txt", notice: "NOTICE.txt" })) validateReference(info.provenance[key], "full/" + name);
+  }
   requireValue(uint(info.chunk_bytes) && info.chunk_bytes > 0 && info.chunk_bytes <= MAX_CHUNK_BYTES
     && Array.isArray(info.chunks) && Array.isArray(info.date_counts), "index tables");
   let previousDate = -Infinity, previousCount = 0;
@@ -157,7 +190,8 @@ export function validateIndex(info) {
   requireValue(previousCount === c.discovery_export, "date total");
   let end = 0;
   info.chunks.forEach((chunk, i) => {
-    payload(chunk, `chunks/${String(i).padStart(6, "0")}.json`, true);
+    if (browser) browserReference(chunk, "chunks/", ".json", true);
+    else payload(chunk, `chunks/${String(i).padStart(6, "0")}.json`, true);
     requireValue(uint(chunk.start) && chunk.start === end && uint(chunk.end) && chunk.end > chunk.start
       && chunk.end <= c.discovery_export && chunk.bytes <= info.chunk_bytes
       && chunk.first_disc === dateAt(info, chunk.start) && chunk.last_disc === dateAt(info, chunk.end - 1), "chunk range");

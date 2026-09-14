@@ -1,5 +1,5 @@
 import { validatePin, validateIndex, validateRecords, verifyBytes, parseJSON, freeze,
-  countThrough, requireValue } from "./contract.js";
+  countThrough, requireValue, validateLatest, validateLatestURL } from "./contract.js";
 
 const aborted = () => new DOMException("Catalogue read cancelled.", "AbortError");
 const check = signal => { if (signal?.aborted) throw aborted(); };
@@ -86,11 +86,41 @@ export async function fetchVerified(ref, url, signal) {
 }
 
 export default class CatalogSource {
+  static async openLatest(url, { signal } = {}) {
+    const location = validateLatestURL(url);
+    // HTTPS origin is the trust boundary. Revalidate once per new session.
+    const response = await fetch(location.href, { signal, cache: "no-cache", redirect: "error" });
+    if (!response.ok || !response.body) {
+      await response.body?.cancel();
+      throw new Error(`Catalogue discovery failed (${response.status}).`);
+    }
+    const reader = response.body.getReader();
+    const bytes = new Uint8Array(4096);
+    let length = 0;
+    try {
+      while (true) {
+        check(signal);
+        const { value, done } = await reader.read();
+        if (done) break;
+        requireValue(length + value.length <= bytes.length, "latest descriptor size");
+        bytes.set(value, length); length += value.length;
+      }
+    } finally { await reader.cancel().catch(() => {}); reader.releaseLock(); }
+    const latest = parseJSON(new TextDecoder("utf-8", { fatal: true }).decode(bytes.subarray(0, length)));
+    const source = await this.open(validateLatest(latest, location.href), { signal });
+    if (source.info.browser_contract_version !== 1) {
+      source.close();
+      throw new Error("Invalid catalogue latest browser contract.");
+    }
+    return source;
+  }
+
   static async open(pin, { mode = "indexed", signal } = {}) {
     validatePin(pin);
     requireValue(mode === "indexed" || mode === "whole", "source mode");
     const bytes = await fetchVerified(pin, pin.url, signal);
     const info = validateIndex(parseJSON(new TextDecoder("utf-8", { fatal: true }).decode(bytes)));
+    requireValue(mode !== "whole" || !!info.full, "whole-file mode unavailable in browser distribution");
     check(signal);
     return new CatalogSource(pin, info, mode);
   }

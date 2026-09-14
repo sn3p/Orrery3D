@@ -1,8 +1,9 @@
 # Local catalog adapter trial
 
-The normal app and Pages workflow continue to use the historical 100,000-object
-catalog. This development trial accepts producer contract v1 bundles in either
-`indexed` or `whole` mode. It adds no catalog/date controls and excludes objects
+Normal build/serve/watch commands now select the larger indexed catalogue through
+[catalogue delivery](catalog-delivery.md). That document covers the current source,
+mode options and the published shared data source. This separate trial supports explicit
+`indexed` or `whole` comparison configurations. It adds no date controls and excludes objects
 without discovery dates. The [approved design](proposals/catalog-loading-adapters.md)
 and [review response](proposals/catalog-loading-adapters-review-response.md)
 record the scope.
@@ -12,7 +13,7 @@ record the scope.
 Use the project's Node version and run `npm ci`. Obtain the original, complete
 indexed bundle and its trusted pin from the
 [producer handoff](https://github.com/sn3p/orrery-data/blob/f6f4a1d4e807362417c74ecbd2b74ce73306d41d/docs/consumer-handoff.md).
-There is no public indexed release URL yet. Keep the original `full/`, `chunks/`
+There is no public complete-v1 archive URL. Keep the original `full/`, `chunks/`
 and `index.json`; transferring only runtime JSON files is insufficient for
 this bundle's provisioning check.
 
@@ -47,7 +48,7 @@ choose another available port. It serves HTTP gzip for JSON/app assets, includin
 the original catalog sidecars. Change mode to `whole` and rebuild for the
 comparison. Rebuild and restart the server after source/config changes; this
 trial server does not watch and caches compressed app assets for its lifetime.
-The normal `npm run serve` still runs the historical app.
+The normal `npm run serve` reads the tracked `catalog.config.json` indexed selection.
 
 ## Data flow and verification
 
@@ -127,15 +128,25 @@ These local results do not establish actual Pages delivery or phone performance.
 
 ## Before public rollout
 
-A public immutable source, Pages retrieval/assembly job, hosted compression and
-failure checks, and prior-version retention/rollback need separately scoped work.
-The existing Pages job has no placeholder release dependency and does not enable
-the trial. To verify assembly locally in the normal output directory:
+The tracked default now uses the published `orrery-data` browser distribution.
+Clean build/serve/watch commands require no local catalogue or data-host access.
+Live loading, decoded hashes, gzip and CORS were verified in the browser; the
+three-browser fixture workflows cover failures, source replacement and reload.
+The GitHub build and all three browser suites pass with the hosted default.
+See [catalogue delivery](catalog-delivery.md#verification-and-remaining-rollout-limits)
+for current behavior and limits: the public app needs a smoke check after this
+PR's deployment, and physical-phone performance remains unverified. Producer
+refreshes may stay manual; release retention is not required.
+
+Optional pinned acquisition, verified assembly and retained-version rollback
+remain available for complete-bundle comparisons. To verify such an assembly
+locally in the normal output directory:
 
 ```sh
 npm run catalog:build -- .context/catalog-config.json dist
 ```
 
-This replaces local generated `dist/`; `npm run build -- --output-clean` restores
-the historical build. It does not deploy. A public switch requires the measured
-acceptance decision; the producer merge alone does not authorize it.
+This replaces local generated `dist/`; `npm run build -- --output-clean` rebuilds
+the normal tracked shared-source selection. It does not deploy. Historical mode
+and its rollback option have been removed; the old dataset is only a renderer
+test fixture.

@@ -20,7 +20,7 @@ async function serve(port = 0, entry = path.join(__dirname, "browser.js")) {
   const routes = {
     "/": [path.join(__dirname, "index.html"), "text/html"],
     "/benchmark.js": [path.join(output, "benchmark.js"), "text/javascript"],
-    "/catalog.json": [path.join(root, "data/catalog.json"), "application/json"],
+    "/catalog.json": [path.join(root, "tests/fixtures/renderer/catalog.json"), "application/json"],
   };
   const server = http.createServer((req, res) => {
     const route = routes[new URL(req.url, "http://localhost").pathname];

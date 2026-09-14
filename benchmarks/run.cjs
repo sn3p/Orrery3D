@@ -43,7 +43,7 @@ async function main() {
       harnessSha256: Object.fromEntries(["browser.js", "run.cjs", "server.cjs", "index.html", "../package-lock.json", "../src/js/Asteroids.js", "../src/js/prepareCatalogue.js", "../src/js/constants.js", "../src/js/Orrery3D.js", "../src/js/Orbit.js", "../src/js/Planet.js", "../src/js/Sun.js", "../src/js/createSphere.js", "../src/js/planets.js", "../src/js/PlaybackClock.js", "../src/js/Gui/index.js", "../src/js/Gui/Stats.js"].map(file => [file,
         crypto.createHash("sha256").update(fs.readFileSync(path.join(__dirname, file))).digest("hex")
       ])),
-      catalogueSha256: crypto.createHash("sha256").update(fs.readFileSync(path.join(__dirname, "../data/catalog.json"))).digest("hex"),
+      catalogueSha256: crypto.createHash("sha256").update(fs.readFileSync(path.join(__dirname, "../tests/fixtures/renderer/catalog.json"))).digest("hex"),
       browserVersion: context.browser().version(), headless, energySaver,
       battery: await page.evaluate(async () => {
         if (!navigator.getBattery) return null;

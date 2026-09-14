@@ -1,5 +1,8 @@
 # Catalog adapter trial results
 
+> Trial-era record: the later rollout removes the historical app mode and fallback.
+> Current selection and delivery are documented in [catalogue delivery](catalog-delivery.md).
+
 The local indexed consumer trial supports **895,910 dated objects** and meets
 the provisional desktop budgets at the agreed February 1980 start. The whole-file
 control fails the startup and loading-task budgets. This supports continuing with

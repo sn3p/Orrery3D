@@ -206,7 +206,7 @@ export default class Orrery3D {
 
   // Trial boot and internal source replacement use the same lifecycle. No
   // public catalog selector or date-navigation control is introduced.
-  async loadCatalog(pin, { mode = "indexed" } = {}) {
+  async loadCatalog(pin, { mode = "indexed", latest } = {}) {
     if (this.disposed) return;
     this.catalogOpening?.abort();
     const opening = this.catalogOpening = new AbortController();
@@ -221,7 +221,9 @@ export default class Orrery3D {
     this.setStatus("Loading asteroids…");
     this.resetClock();
     try {
-      const source = await CatalogSource.open(pin, { mode, signal: opening.signal });
+      const source = latest !== undefined
+        ? await CatalogSource.openLatest(latest, { signal: opening.signal })
+        : await CatalogSource.open(pin, { mode, signal: opening.signal });
       if (this.disposed || opening !== this.catalogOpening) { source.close(); return; }
       loader.activate(source, this.jed);
       this.demandCatalog(this.jed);

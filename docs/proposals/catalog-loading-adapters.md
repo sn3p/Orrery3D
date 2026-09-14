@@ -1,5 +1,8 @@
 # Proposal: catalog loading adapters for Orrery3D
 
+> Trial-era record: the later rollout removes the historical app mode and fallback.
+> Current selection and delivery are documented in [catalogue delivery](../catalog-delivery.md).
+
 **Revision 2 — approved for implementation, 13 September 2026.** Incorporates the supplied [review](catalog-loading-adapters-review.md); see the [response to each finding](catalog-loading-adapters-review-response.md). The user approved these implementation choices and provisional budgets after reviewing this revision. The local trial is now implemented; see [usage and verification](../catalog-trial.md). A production switch remains separately scoped.
 
 ## Recommended design

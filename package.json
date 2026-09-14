@@ -12,11 +12,11 @@
     "catalog:build": "node scripts/catalog.cjs build",
     "catalog:serve": "node scripts/serve-catalog.cjs",
     "catalog:benchmark": "node benchmarks/catalog-loading.cjs",
-    "build": "webpack --config webpack.config.js --mode production",
+    "build": "node scripts/build.cjs",
     "deploy": "gh workflow run pages.yml --ref master",
-    "watch": "webpack --config webpack.config.js --mode development --watch",
-    "serve": "webpack serve --mode development --open",
-    "test": "node --test tests/catalog-source.cjs && node tests/run.cjs"
+    "watch": "webpack --config webpack.app.config.cjs --mode development --watch",
+    "serve": "webpack serve --config webpack.app.config.cjs --mode development --open",
+    "test": "node --test --test-concurrency=1 tests/catalog-source.cjs tests/catalog-delivery.cjs tests/catalog-latest.cjs && node tests/run.cjs"
   },
   "dependencies": {
     "dat.gui": "^0.7.9",
@@ -34,6 +34,7 @@
     "postcss-import": "^17.0.0",
     "postcss-loader": "^8.2.1",
     "postcss-preset-env": "^11.5.2",
+    "tar": "^7.5.22",
     "terser-webpack-plugin": "^5.6.1",
     "webpack": "^5.110.3",
     "webpack-cli": "^7.2.3",
