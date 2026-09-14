@@ -1,4 +1,4 @@
-// Local, offline provisioning. Never resolves a mutable "latest" data release.
+// Complete pinned-bundle provisioning. Never resolves a mutable "latest" release.
 const fs = require("node:fs/promises");
 const { createReadStream } = require("node:fs");
 const path = require("node:path");
@@ -97,52 +97,127 @@ async function stageVerifiedBundle(source, pin, destinationRoot, verified) {
   return { directory: destination, verified };
 }
 
-async function buildTrial(configPath, output = path.join(root, ".context/catalog-site"), { entry = "./src/index.js" } = {}) {
-  output = path.resolve(output);
-  // webpack clean recursively removes old files. Only generated app locations
-  // are eligible; never clean a source checkout, config, input bundle or cache.
+async function prepareCatalog(configPath, { publicDefaults = false } = {}) {
+  const config = JSON.parse(await fs.readFile(configPath, "utf8"));
+  if (!["indexed", "whole", "historical"].includes(config.mode)) throw new Error("Choose indexed, whole or historical mode.");
+  for (const key of ["startJed", "speed"]) {
+    if (config[key] !== undefined && !Number.isFinite(config[key])) throw new Error("Invalid catalogue " + key + ".");
+  }
+  if (config.retained !== undefined && !Array.isArray(config.retained)) throw new Error("retained must be an array of pinned bundles.");
+  const inputs = [...(config.mode === "historical" ? [] : [config]), ...(config.retained || [])];
+  const staged = [];
+  for (const input of inputs) {
+    if (!input || (typeof input.bundle === "string") === !!input.archive) {
+      throw new Error("Choose exactly one local bundle or pinned archive.");
+    }
+    const source = input.bundle !== undefined
+      ? path.resolve(path.dirname(configPath), input.bundle)
+      : await require("./catalog-archive.cjs").acquireArchive(input.archive, input.pin);
+    const item = await stageVerifiedBundle(source, input.pin, cache, await verifyBundle(source, input.pin));
+    if (!staged.some(other => other.pin.sha256 === input.pin.sha256)) staged.push({ ...item, pin: input.pin });
+  }
+  if (config.mode === "historical") return { staged, runtime: null };
+  const runtime = { pin: { ...config.pin, url: "data/" + path.basename(staged[0].directory) + "/index.json" }, mode: config.mode };
+  if (config.startJed !== undefined || !publicDefaults) runtime.startJed = config.startJed ?? 2444270.5;
+  if (config.speed !== undefined || !publicDefaults) runtime.speed = config.speed ?? 1.5;
+  return { staged, runtime };
+}
+
+function catalogPlugins(base, runtime) {
+  const webpack = require("webpack");
+  return base.plugins.map(plugin => plugin instanceof webpack.DefinePlugin
+    && Object.hasOwn(plugin.definitions, "__CATALOG_TRIAL__")
+    ? new webpack.DefinePlugin({ ...plugin.definitions, __CATALOG_TRIAL__: JSON.stringify(runtime) }) : plugin);
+}
+
+async function stageCatalog(prepared, output) {
+  for (const item of prepared.staged) {
+    await stageVerifiedBundle(item.directory, item.pin, path.join(output, "data"), item.verified);
+  }
+}
+
+async function checkOutput(configPath, output) {
   if (output !== path.join(root, "dist") && !output.startsWith(path.join(root, ".context") + path.sep)) {
     throw new Error("Trial output must be dist or a generated directory inside .context.");
   }
   const config = JSON.parse(await fs.readFile(configPath, "utf8"));
-  if (!["indexed", "whole"].includes(config.mode)) throw new Error("Choose indexed or whole mode.");
-  const source = path.resolve(path.dirname(configPath), config.bundle);
   const overlaps = (a, b) => a === b || a.startsWith(b + path.sep) || b.startsWith(a + path.sep);
-  for (const protectedPath of [source, cache, path.resolve(configPath)]) {
+  const sources = [config, ...(Array.isArray(config.retained) ? config.retained : [])]
+    .filter(input => typeof input?.bundle === "string").map(input => path.resolve(path.dirname(configPath), input.bundle));
+  for (const protectedPath of [...sources, cache, path.join(root, ".context/catalog-downloads"), path.resolve(configPath)]) {
     if (overlaps(output, protectedPath)) throw new Error("Trial output overlaps an input, config or cache.");
   }
-  // Refuse symlinked output ancestors before the cleaner sees them.
   for (let directory = output; directory !== root; directory = path.dirname(directory)) {
     try { if ((await fs.lstat(directory)).isSymbolicLink()) throw new Error("Trial output must not traverse symlinks."); }
     catch (error) { if (error.code !== "ENOENT") throw error; }
   }
-  const staged = await stageVerifiedBundle(source, config.pin, cache, await verifyBundle(source, config.pin));
-  const webpack = require("webpack"), base = require("../webpack.config.js");
-  const runtime = { pin: { ...config.pin, url: "data/" + path.basename(staged.directory) + "/index.json" },
-    mode: config.mode, startJed: config.startJed ?? 2444270.5, speed: config.speed ?? 1.5 };
-  const plugins = base.plugins.map(plugin => plugin instanceof webpack.DefinePlugin
-    && Object.hasOwn(plugin.definitions, "__CATALOG_TRIAL__")
-    ? new webpack.DefinePlugin({ ...plugin.definitions, __CATALOG_TRIAL__: JSON.stringify(runtime) }) : plugin);
-  await new Promise((resolve, reject) => {
-    const compiler = webpack({ ...base, mode: "production", plugins, entry,
-      output: { ...base.output, path: path.resolve(output), clean: true } });
-    compiler.run((error, stats) => compiler.close(() => {
-      if (error || stats.hasErrors()) reject(error || new Error(stats.toString("errors-only")));
-      else resolve();
-    }));
-  });
-  // The cache survives webpack's clean. Copy original sidecars/provenance
-  // afterward, then verify in the final deployment path.
-  const deployed = await stageVerifiedBundle(staged.directory, config.pin,
-    path.join(path.resolve(output), "data"), staged.verified);
-  return { output: path.resolve(output), bundle: deployed.directory, runtime };
 }
 
-module.exports = { verifyBundle, stageBundle, buildTrial, hashFile };
+async function buildTrial(configPath, output = path.join(root, ".context/catalog-site"),
+  { entry = "./src/index.js", publicDefaults = false } = {}) {
+  output = path.resolve(output);
+  await checkOutput(configPath, output);
+  await fs.mkdir(path.dirname(output), { recursive: true });
+  // A competing build must not replace this output. An interrupted lock retains
+  // its private stage/previous output for inspection rather than deleting it.
+  const lock = output + ".build-lock";
+  try { await fs.mkdir(lock); }
+  catch (error) { if (error.code === "EEXIST") throw new Error("Catalogue output is locked: " + lock); throw error; }
+  const temporary = path.join(lock, "site"), previous = path.join(lock, "previous");
+  let preserveRecovery = false;
+  try {
+    const prepared = await prepareCatalog(configPath, { publicDefaults });
+    const webpack = require("webpack"), base = require("../webpack.config.js");
+    await new Promise((resolve, reject) => {
+      const compiler = webpack({ ...base, mode: "production", plugins: catalogPlugins(base, prepared.runtime), entry,
+        output: { ...base.output, path: temporary, clean: true } });
+      compiler.run((error, stats) => compiler.close(() => {
+        if (error || stats.hasErrors()) reject(error || new Error(stats.toString("errors-only")));
+        else resolve();
+      }));
+    });
+    await stageCatalog(prepared, temporary);
+    let siteBytes = 0;
+    for (const name of await fs.readdir(temporary, { recursive: true, withFileTypes: true })) {
+      if (name.isFile()) siteBytes += (await fs.stat(path.join(name.parentPath, name.name))).size;
+    }
+    if (siteBytes > 900_000_000) throw new Error("Catalogue site exceeds its 900 MB Pages preparation budget.");
+    let hadPrevious = false;
+    try { await fs.rename(output, previous); hadPrevious = true; }
+    catch (error) { if (error.code !== "ENOENT") throw error; }
+    try { await fs.rename(temporary, output); }
+    catch (error) {
+      if (hadPrevious) {
+        try { await fs.rename(previous, output); }
+        catch (restoreError) { preserveRecovery = true; throw new Error("Restore previous output from " + previous, { cause: restoreError }); }
+      }
+      throw error;
+    }
+    return { output, bundle: prepared.runtime ? path.join(output, "data", path.basename(prepared.staged[0].directory)) : null,
+      runtime: prepared.runtime, siteBytes, retained: prepared.staged.slice(prepared.runtime ? 1 : 0).map(item => item.pin.sha256) };
+  } finally { if (!preserveRecovery) await fs.rm(lock, { force: true, recursive: true }); }
+}
+
+module.exports = { verifyBundle, stageBundle, buildTrial, hashFile, prepareCatalog, catalogPlugins, stageCatalog, checkOutput };
 if (require.main === module) {
   const [command, config, output] = process.argv.slice(2);
-  if (command !== "build" || !config) {
-    console.error("Usage: node scripts/catalog.cjs build CONFIG.json [OUTPUT_DIRECTORY]");
+  if (command === "pack" && config && output) {
+    (async () => {
+      const settings = JSON.parse(await fs.readFile(config, "utf8"));
+      if (typeof settings.bundle !== "string") throw new Error("Packing requires a local complete bundle.");
+      const filename = path.resolve(output), bundle = path.resolve(path.dirname(config), settings.bundle);
+      if (!filename.startsWith(path.join(root, ".context") + path.sep) || !filename.endsWith(".tar.gz")) {
+        throw new Error("Archive output must be a .tar.gz file inside .context.");
+      }
+      if (filename.startsWith(bundle + path.sep)) throw new Error("Archive output must be outside the source bundle.");
+      try { await fs.lstat(filename); throw new Error("Archive output already exists."); }
+      catch (error) { if (error.code !== "ENOENT") throw error; }
+      await fs.mkdir(path.dirname(filename), { recursive: true });
+      const archive = await require("./catalog-archive.cjs").packBundle(bundle, settings.pin, filename);
+      console.log(JSON.stringify({ filename, archive, pin: settings.pin }, null, 2));
+    })().catch(error => { console.error(error); process.exitCode = 1; });
+  } else if (command !== "build" || !config) {
+    console.error("Usage: node scripts/catalog.cjs build CONFIG.json [OUTPUT_DIRECTORY] | pack CONFIG.json OUTPUT.tar.gz");
     process.exitCode = 1;
   } else buildTrial(path.resolve(config), output).then(result => console.log(JSON.stringify(result, null, 2)))
     .catch(error => { console.error(error); process.exitCode = 1; });

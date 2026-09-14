@@ -1,8 +1,9 @@
 # Local catalog adapter trial
 
-The normal app and Pages workflow continue to use the historical 100,000-object
-catalog. This development trial accepts producer contract v1 bundles in either
-`indexed` or `whole` mode. It adds no catalog/date controls and excludes objects
+Normal build/serve/watch commands now select the larger indexed catalogue through
+[catalogue delivery](catalog-delivery.md). That document covers the current source,
+mode options and pending public provisioning. This separate trial supports explicit
+`indexed` or `whole` comparison configurations. It adds no date controls and excludes objects
 without discovery dates. The [approved design](proposals/catalog-loading-adapters.md)
 and [review response](proposals/catalog-loading-adapters-review-response.md)
 record the scope.
@@ -47,7 +48,7 @@ choose another available port. It serves HTTP gzip for JSON/app assets, includin
 the original catalog sidecars. Change mode to `whole` and rebuild for the
 comparison. Rebuild and restart the server after source/config changes; this
 trial server does not watch and caches compressed app assets for its lifetime.
-The normal `npm run serve` still runs the historical app.
+The normal `npm run serve` reads the tracked `catalog.config.json` indexed selection.
 
 ## Data flow and verification
 
@@ -127,15 +128,17 @@ These local results do not establish actual Pages delivery or phone performance.
 
 ## Before public rollout
 
-A public immutable source, Pages retrieval/assembly job, hosted compression and
-failure checks, and prior-version retention/rollback need separately scoped work.
-The existing Pages job has no placeholder release dependency and does not enable
-the trial. To verify assembly locally in the normal output directory:
+Pinned acquisition, verified assembly and retained-version rollback are implemented.
+Providing a portable catalogue source and verifying hosted compression, failure
+and update behavior remain outstanding. See the delivery document for the latest
+user direction: manually refreshed current data without required release retention.
+The Pages job reads the normal tracked catalogue selection; its current local
+source must become available to a fresh CI build. To verify assembly locally in the normal output directory:
 
 ```sh
 npm run catalog:build -- .context/catalog-config.json dist
 ```
 
-This replaces local generated `dist/`; `npm run build -- --output-clean` restores
-the historical build. It does not deploy. A public switch requires the measured
-acceptance decision; the producer merge alone does not authorize it.
+This replaces local generated `dist/`; `npm run build -- --output-clean` rebuilds
+the normal tracked selection. It does not deploy. Historical rollback must be
+selected explicitly as described in the delivery documentation.

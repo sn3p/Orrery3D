@@ -21,7 +21,7 @@ nvm install
 nvm use
 ```
 
-The checked-in catalogue is ready to use. The commands below start the app on port 3000, and `npm run benchmark:serve` starts the benchmark on port 3001. See the [benchmark instructions](benchmarks/README.md) for details.
+The indexed catalogue must first be provisioned as described in [catalogue delivery](docs/catalog-delivery.md); portable latest-data provisioning is pending on this branch. The commands below start the app on port 3000, and `npm run benchmark:serve` starts the benchmark on port 3001. See the [benchmark instructions](benchmarks/README.md) for details.
 
 Install dependencies:
 
@@ -60,7 +60,7 @@ npx playwright install firefox webkit
 BROWSERS=chromium,firefox,webkit npm test
 ```
 
-Tests build the real app and exercise loading, playback, discoveries, colours, camera controls, resizing, graphics recovery and errors. They also compare GPU positions against the orbital model across the full catalogue at 12 dates, check extreme elliptical orbits with an independent solver, and compare rendered pixels in overview and close views. WebKit testing is not a substitute for testing Safari and iOS on their actual devices.
+Tests build the real app and exercise loading, playback, discoveries, colours, camera controls, resizing, graphics recovery and errors. They also compare GPU positions against the orbital model across the historical 100,000-object control catalogue at 12 dates, check extreme elliptical orbits with an independent solver, and compare rendered pixels in overview and close views. WebKit testing is not a substitute for testing Safari and iOS on their actual devices.
 
 Each invocation replaces `.context/tests/report/` with fresh results and screenshots.
 `run.json` records the current stage, outcome and failure stack, including build or
@@ -100,8 +100,9 @@ the order they enter GitHub's concurrency queue. New runs beyond that limit are
 canceled by GitHub; see the [queue documentation](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax#example-queueing-multiple-pending-runs).
 
 `dist/` is generated and ignored. No local build, generated-file commit, or push to `gh-pages` is needed to deploy.
-The workflow publishes the checked-in catalogue; it does not download fresh MPC
-data.
+The workflow uses the indexed selection in `catalog.config.json`. See
+[catalogue delivery](docs/catalog-delivery.md) for provisioning, mode options and
+the pending public download source. Builds do not refresh MPC data.
 
 To deploy `master` again, open **Actions → GitHub Pages → Run workflow**, select
 `master`, or use the authenticated [GitHub CLI](https://cli.github.com/):
@@ -122,13 +123,13 @@ GitHub's built-in token; no personal access token or deploy key is needed.
 
 ## Get updated data
 
-The bundled [`data/catalog.json`](data/catalog.json) contains **100,000 objects**. The app uses this checked-in snapshot; it does not fetch fresh MPC data at runtime.
+Normal build, serve and watch commands select the **895,910-object indexed catalogue** in `catalog.config.json`. There is no 100,000-object cap. The displayed count follows the simulation date and reaches the full discovery-dated population as time advances. The bundled [`data/catalog.json`](data/catalog.json) remains available for historical rollback and regression comparisons. The app does not fetch fresh MPC data at runtime.
 
 An [import in Orrery](https://github.com/sn3p/Orrery/pull/49) on **12 September 2026** produced **895,910 objects with matching discovery dates** from **1,563,495 orbital records**. The other **667,585** were unnumbered objects without matching discovery records in `NumberedMPs.txt`. These are dated counts that change with MPC updates; see [Orrery issue #47](https://github.com/sn3p/Orrery/issues/47) for the source verification and discovery-date limitation.
 
-Orrery3D currently includes the generated catalogue only; the download/import scripts are not included in this repository. Shared catalogue tooling is maintained in [orrery-data](https://github.com/sn3p/orrery-data). An optional [local consumer trial](docs/catalog-trial.md) supports its indexed chunks and whole-file delivery with the same pinned validation. The public app remains on its historical catalog.
+Orrery3D currently includes the generated catalogue only; the download/import scripts are not included in this repository. Shared catalogue tooling is maintained in [orrery-data](https://github.com/sn3p/orrery-data). The [delivery configuration](docs/catalog-delivery.md) selects indexed chunks by default; `whole` supports comparison and `historical` supports rollback. The current branch uses the provisioned local bundle; a portable catalogue source is still required for fresh CI builds. The deployed site changes only after merge and deployment.
 
-Larger catalogues increase download, parsing, preparation and memory costs even with GPU rendering. The benchmark's larger counts repeat the bundled records and positions; the optional trial exercises the real 895,910-object export, with [recorded loading and memory measurements](docs/catalog-trial-results.md). The current discovery animation requires a finite discovery date for every object.
+Larger catalogues increase download, parsing, preparation and memory costs even with GPU rendering. The benchmark's larger counts repeat the bundled records and positions; the catalogue loader exercises the real 895,910-object export, with [recorded loading and memory measurements](docs/catalog-trial-results.md). The current discovery animation requires a finite discovery date for every object.
 
 ## Rendering
 

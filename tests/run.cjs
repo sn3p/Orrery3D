@@ -65,6 +65,8 @@ async function main() {
   await build("./src/index.js", path.join(buildOutput, "production"));
   diagnostics.stage("build catalog adapter trials");
   await require("./catalog-loading.cjs").build(buildOutput);
+  diagnostics.stage("build selected standard catalogue entry");
+  require("./catalog-delivery-browser.cjs").build(buildOutput);
   const server = http.createServer((req, res) => {
     const pathname = new URL(req.url, "http://localhost").pathname;
     if (pathname.endsWith("/favicon.ico")) { res.writeHead(204); res.end(); return; }
@@ -89,6 +91,8 @@ async function main() {
         diagnostics.stage(`${name}: diagnostic failure regressions`);
         const diagnosticChecks = await require("./diagnostics-regression.cjs")(instance, output, name);
         const browser = diagnostics.browser(instance, name);
+        diagnostics.stage(name + ": selected standard catalogue entry");
+        await require("./catalog-delivery-browser.cjs").run(browser, url, output, name);
         diagnostics.stage(name + ": catalog adapter lifecycle");
         const catalogLoading = await require("./catalog-loading.cjs").run(browser, url, output, name);
         diagnostics.stage(`${name}: WebGL 2 capability`);

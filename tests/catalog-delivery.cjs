@@ -1,0 +1,244 @@
+const { test } = require("node:test");
+const assert = require("node:assert/strict");
+const fs = require("node:fs/promises");
+const path = require("node:path");
+const http = require("node:http");
+const { spawn } = require("node:child_process");
+const { once } = require("node:events");
+const tar = require("tar");
+const { gzipSync } = require("node:zlib");
+const { acquireArchive, packBundle } = require("../scripts/catalog-archive.cjs");
+const { verifyBundle, hashFile, buildTrial } = require("../scripts/catalog.cjs");
+const cases = require("./fixtures/consumer-v1/cases.json");
+const root = path.resolve(__dirname, "..");
+const fixtures = path.join(__dirname, "fixtures/consumer-v1");
+const pin = cases.bundles.ties.pin;
+
+async function temporary(t) {
+  await fs.mkdir(path.join(root, ".context"), { recursive: true });
+  const directory = await fs.mkdtemp(path.join(root, ".context/delivery-test-"));
+  t.after(() => fs.rm(directory, { recursive: true, force: true }));
+  return directory;
+}
+
+async function host(t, filename) {
+  let body = await fs.readFile(filename), status = 200, requests = 0, interrupted = false, compressed = false;
+  const server = http.createServer((req, res) => {
+    requests++;
+    res.writeHead(status, compressed ? { "Content-Encoding": "gzip" } : {});
+    if (interrupted) { res.write(body.subarray(0, 20)); res.destroy(); }
+    else res.end(compressed ? gzipSync(body) : body);
+  });
+  await new Promise(resolve => server.listen(0, "127.0.0.1", resolve));
+  t.after(async () => { server.closeAllConnections(); await new Promise(resolve => server.close(resolve)); });
+  return { url: `http://127.0.0.1:${server.address().port}/bundle.tar.gz`,
+    get requests() { return requests; }, body(value) { body = value; }, status(value) { status = value; },
+    interrupt(value) { interrupted = value; }, compress(value) { compressed = value; } };
+}
+
+async function command(args, env = {}) {
+  const child = spawn(process.execPath, args, { cwd: root, env: { ...process.env, CATALOG_CONFIG: "", ...env } });
+  let output = "";
+  child.stdout.on("data", chunk => { output += chunk; }); child.stderr.on("data", chunk => { output += chunk; });
+  const [code] = await once(child, "exit");
+  return { code, output };
+}
+// npm is normally supplied by npm test. Direct node --test uses the sibling CLI.
+function npmArgs(args) {
+  const cli = process.env.npm_execpath || path.resolve(path.dirname(process.execPath), "../lib/node_modules/npm/bin/npm-cli.js");
+  return [cli, ...args];
+}
+
+test("the ordinary app selects the full indexed catalogue without a local override", async () => {
+  const result = await command(["-e", 'process.stdout.write(require("./scripts/catalog-selection.cjs")())']);
+  assert.equal(result.code, 0, result.output);
+  assert.equal(result.output, path.join(root, "catalog.config.json"));
+  const config = JSON.parse(await fs.readFile(result.output, "utf8"));
+  assert.equal(config.mode, "indexed", "Normal commands must not return to the historical 100,000-object selection");
+  assert.equal(config.pin.sha256, "bf4252e0e20b6db07df83a2d87f731788235067fbcd2d3a78c98f92083880db2");
+  assert(!Object.hasOwn(config, "startJed"), "Keep the browser-local public starting date");
+  assert(!Object.hasOwn(config, "speed"), "Keep the public playback speed");
+});
+
+test("pinned HTTP archive acquisition: complete cold/warm/repair, transfer errors and independent index trust", async t => {
+  const directory = await temporary(t), filename = path.join(directory, "bundle.tar.gz");
+  const digest = await packBundle(path.join(fixtures, "ties"), pin, filename);
+  const server = await host(t, filename), archive = { ...digest, url: server.url };
+  const cache = path.join(directory, "cache");
+  const acquired = await acquireArchive(archive, pin, cache);
+  await verifyBundle(acquired, pin);
+  assert.equal(server.requests, 1);
+  server.status(404);
+  assert.equal(await acquireArchive(archive, pin, cache), acquired, "Warm verified cache works offline");
+  assert.equal(server.requests, 1);
+  await fs.rm(path.join(acquired, "chunks/000001.json"));
+  await assert.rejects(acquireArchive(archive, pin, cache), /404/);
+  assert(await fs.stat(path.join(acquired, "index.json")), "Failed repair preserves the existing cache");
+  server.status(200); server.compress(true);
+  await acquireArchive(archive, pin, cache); await verifyBundle(acquired, pin);
+  assert.equal(server.requests, 3);
+  for (const [name, reference, indexPin] of [
+    ["hash", { ...archive, sha256: "0".repeat(64) }, pin],
+    ["oversize", { ...archive, bytes: archive.bytes - 1 }, pin],
+    ["short", { ...archive, bytes: archive.bytes + 1 }, pin],
+    ["index", archive, { ...pin, sha256: "0".repeat(64) }],
+  ]) await assert.rejects(acquireArchive(reference, indexPin, path.join(directory, name)));
+  server.interrupt(true);
+  await assert.rejects(acquireArchive(archive, pin, path.join(directory, "interrupted")));
+  await verifyBundle(acquired, pin);
+  assert(!(await fs.readdir(directory)).some(name => name.startsWith(".catalog-acquire-")));
+});
+
+test("a checksum-valid archive still rejects links, duplicate entries and incomplete producer inventory", async t => {
+  const directory = await temporary(t), filename = path.join(directory, "invalid.tar.gz");
+  const source = path.join(directory, "source");
+  await fs.cp(path.join(fixtures, "ties"), source, { recursive: true });
+  await fs.symlink("index.json", path.join(source, "link"));
+  for (const entries of [["index.json", "link"], ["index.json", "index.json"], ["index.json"]]) {
+    await tar.c({ file: filename, cwd: source, gzip: true, portable: true }, entries);
+    const server = await host(t, filename);
+    await assert.rejects(acquireArchive({ ...await hashFile(filename), url: server.url }, pin, path.join(directory, "cache")));
+  }
+});
+
+test("private assembly preserves prior output on compile/final-copy failure and rejects concurrent replacement", async t => {
+  const directory = await temporary(t), config = path.join(directory, "config.json"), output = path.join(directory, "site");
+  await fs.writeFile(config, JSON.stringify({ bundle: path.join(fixtures, "ties"), pin, mode: "indexed" }));
+  const entry = path.join(directory, "entry.js");
+  await fs.writeFile(entry, "globalThis.selection = __CATALOG_TRIAL__;");
+  const built = await buildTrial(config, output, { entry, publicDefaults: true });
+  assert(!Object.hasOwn(built.runtime, "startJed")); assert(!Object.hasOwn(built.runtime, "speed"));
+  const before = await hashFile(path.join(output, "bundle.js"));
+  await fs.writeFile(entry, "import './missing-module.js';");
+  await assert.rejects(buildTrial(config, output, { entry }));
+  assert.deepEqual(await hashFile(path.join(output, "bundle.js")), before);
+  await fs.writeFile(entry, "globalThis.selection = __CATALOG_TRIAL__;");
+  const original = fs.copyFile;
+  fs.copyFile = async (source, destination, ...args) => {
+    if (destination.includes(".build-lock/site/data/")) throw new Error("Simulated staging failure");
+    return original(source, destination, ...args);
+  };
+  try { await assert.rejects(buildTrial(config, output, { entry }), /Simulated staging failure/); }
+  finally { fs.copyFile = original; }
+  assert.deepEqual(await hashFile(path.join(output, "bundle.js")), before);
+  await verifyBundle(built.bundle, pin);
+  await fs.mkdir(output + ".build-lock");
+  await assert.rejects(buildTrial(config, output, { entry }), /locked/);
+  await fs.rm(output + ".build-lock", { recursive: true });
+});
+
+test("explicit retention survives update and rollback with each original pin", async t => {
+  const directory = await temporary(t), config = path.join(directory, "config.json"), output = path.join(directory, "site");
+  const entry = path.join(directory, "entry.js");
+  await fs.writeFile(entry, "globalThis.selection = __CATALOG_TRIAL__;");
+  const profiles = ["ties", "empty"].map(name => ({ bundle: path.join(fixtures, name), pin: cases.bundles[name].pin }));
+  const server = http.createServer(async (req, res) => {
+    try { res.end(await fs.readFile(path.join(output, req.url))); }
+    catch { res.writeHead(404); res.end(); }
+  });
+  await new Promise(resolve => server.listen(0, "127.0.0.1", resolve));
+  t.after(async () => { server.closeAllConnections(); await new Promise(resolve => server.close(resolve)); });
+  const { default: Source } = await import("../src/js/catalog/CatalogSource.js");
+  const opened = [];
+  t.after(() => opened.forEach(source => source.close()));
+  const collect = async read => { const rows = []; for await (const event of read) if (event.type === "batch") rows.push(...event.records); return rows; };
+  for (const [current, retained] of [[0, 1], [1, 0], [0, 1]]) {
+    await fs.writeFile(config, JSON.stringify({ ...profiles[current], mode: "indexed", retained: [profiles[retained]] }));
+    await buildTrial(config, output, { entry, publicDefaults: true });
+    for (const profile of profiles) await verifyBundle(path.join(output, "data/delivery-v1-" + profile.pin.sha256), profile.pin);
+    if (opened.length === 0) {
+      const source = await Source.open({ ...pin, url: `http://127.0.0.1:${server.address().port}/data/delivery-v1-${pin.sha256}/index.json` });
+      opened.push(source);
+      assert.equal((await collect(source.read({ start: 0, end: 2 }))).length, 2);
+    } else {
+      // Already-open source requests previously unfetched chunks after replacement.
+      assert.equal((await collect(opened[0].read({ start: 2, end: 6 }))).length, 4);
+      const other = profiles[1].pin;
+      const source = await Source.open({ ...other, url: `http://127.0.0.1:${server.address().port}/data/delivery-v1-${other.sha256}/index.json` });
+      opened.push(source);
+      assert.equal((await collect(source.read({ start: 0, end: 0 }))).length, 0);
+    }
+  }
+  await fs.writeFile(config, JSON.stringify({ mode: "historical", retained: profiles }));
+  // The public command must keep old indexed clients alive during rollback.
+  const rollback = await command(npmArgs(["run", "build", "--", "--output-clean"]), { CATALOG_CONFIG: config });
+  assert.equal(rollback.code, 0, rollback.output);
+  for (const profile of profiles) await verifyBundle(path.join(root, "dist/data/delivery-v1-" + profile.pin.sha256), profile.pin);
+  const built = await buildTrial(config, output, { entry, publicDefaults: true });
+  assert.equal(built.runtime, null);
+  assert.equal((await collect(opened[0].read({ start: 2, end: 6 }))).length, 4);
+});
+
+test("standard build selects configuration, preserves historical asset, and fails closed for missing configuration", async t => {
+  const directory = await temporary(t), config = path.join(directory, "config.json");
+  await fs.writeFile(config, JSON.stringify({ bundle: path.join(fixtures, "ties"), pin, mode: "indexed" }));
+  const result = await command(npmArgs(["run", "build", "--", "--output-clean"]), { CATALOG_CONFIG: config });
+  assert.equal(result.code, 0, result.output);
+  await verifyBundle(path.join(root, "dist/data/delivery-v1-" + pin.sha256), pin);
+  assert.deepEqual(await hashFile(path.join(root, "dist/data/catalog.json")), await hashFile(path.join(root, "data/catalog.json")));
+  const previous = await hashFile(path.join(root, "dist/bundle.js"));
+  for (const script of ["build", "serve", "watch"]) {
+    const failed = await command(npmArgs(["run", script]), { CATALOG_CONFIG: path.join(directory, "missing.json") });
+    assert.notEqual(failed.code, 0, script + " must reject an explicitly missing configuration");
+  }
+  assert.deepEqual(await hashFile(path.join(root, "dist/bundle.js")), previous);
+});
+
+async function eventually(check, message) {
+  const deadline = Date.now() + 30000;
+  while (Date.now() < deadline) {
+    try { if (await check()) return; } catch { /* Compilation/server startup in progress. */ }
+    await new Promise(resolve => setTimeout(resolve, 100));
+  }
+  throw new Error(message);
+}
+
+test("standard serve and watch keep the selected pin through source recompilation", async t => {
+  const directory = await temporary(t), config = path.join(directory, "config.json"), entry = path.join(directory, "entry.js");
+  await fs.writeFile(config, JSON.stringify({ bundle: path.join(fixtures, "ties"), pin, mode: "indexed" }));
+  for (const script of ["serve", "watch"]) {
+    await fs.writeFile(entry, 'globalThis.deliveryMarker = "delivery-before";');
+    const probe = http.createServer();
+    await new Promise(resolve => probe.listen(0, "127.0.0.1", resolve));
+    const port = probe.address().port;
+    await new Promise(resolve => probe.close(resolve));
+    const extra = script === "serve" ? ["--host", "127.0.0.1", "--port", String(port), "--no-open"] : [];
+    const child = spawn(process.execPath, npmArgs(["run", script, "--", "--entry-reset", "--entry", "./src/index.js", "--entry", entry, ...extra]),
+      { cwd: root, detached: true, env: { ...process.env, CATALOG_CONFIG: config } });
+    let log = "";
+    child.stdout.on("data", chunk => { log += chunk; }); child.stderr.on("data", chunk => { log += chunk; });
+    const stopped = once(child, "exit");
+    const app = async () => script === "serve" ? (await fetch(`http://127.0.0.1:${port}/bundle.js`)).text()
+      : fs.readFile(path.join(root, "dist/bundle.js"), "utf8");
+    try {
+      await eventually(async () => (await app()).includes("delivery-before"), script + " did not compile: " + log);
+      if (script === "serve") {
+        const data = await fetch(`http://127.0.0.1:${port}/data/delivery-v1-${pin.sha256}/index.json`);
+        assert.equal(data.status, 200);
+        assert.equal((await data.arrayBuffer()).byteLength, pin.bytes);
+      }
+      await fs.writeFile(entry, 'globalThis.deliveryMarker = "delivery-after";');
+      await eventually(async () => (await app()).includes("delivery-after"), script + " did not rebuild: " + log);
+      await verifyBundle(path.join(root, "dist/data/delivery-v1-" + pin.sha256), pin);
+      assert((await app()).includes(pin.sha256), "Recompilation retains the configured runtime pin");
+    } catch (error) { throw new Error(error.message + "\n" + log, { cause: error }); } finally {
+      try { process.kill(-child.pid, "SIGTERM"); } catch (error) { if (error.code !== "ESRCH") throw error; }
+      await stopped;
+    }
+  }
+});
+
+test("dev/watch CLI output overrides cannot clean source bundles or split data from the static root", async t => {
+  const directory = await temporary(t), bundle = path.join(directory, "bundle"), config = path.join(directory, "config.json");
+  await fs.cp(path.join(fixtures, "ties"), bundle, { recursive: true });
+  await fs.writeFile(config, JSON.stringify({ bundle, pin, mode: "indexed" }));
+  for (const script of ["serve", "watch"]) {
+    const result = await command(npmArgs(["run", script, "--", "--output-path", bundle, "--output-clean"]), { CATALOG_CONFIG: config });
+    assert.notEqual(result.code, 0);
+    assert.match(result.output, /output must remain dist/);
+    await verifyBundle(bundle, pin);
+  }
+  const moved = await command(npmArgs(["run", "serve", "--", "--static-directory", directory]), { CATALOG_CONFIG: config });
+  assert.notEqual(moved.code, 0);
+  assert.match(moved.output, /static files from dist/);
+});
