@@ -28,6 +28,8 @@ exports.build = async output => {
   const result = await buildTrial(config, path.join(output, "latest/Orrery3D"), { entry: "./tests/catalog-browser.js", publicDefaults: true });
   assert.equal(result.bundle, null);
   await assert.rejects(fs.stat(path.join(result.output, "data")), { code: "ENOENT" });
+  await fs.writeFile(config, JSON.stringify({ mode: "indexed", latest }));
+  await buildTrial(config, path.join(output, "latest-trial"), { entry: "./tests/catalog-browser.js" });
 };
 
 exports.close = async () => {
@@ -38,6 +40,17 @@ exports.close = async () => {
 
 exports.run = async (browser, base, output, name) => {
   current = "ties"; corrupt = false;
+  const trial = await browser.newPage({ timezoneId: "Pacific/Honolulu" });
+  try {
+    await trial.addInitScript(() => { window.requestAnimationFrame = () => 1; });
+    await trial.goto(base + "/latest-trial/");
+    await trial.evaluate(() => window.catalogReady);
+    const playback = await trial.evaluate(() => ({ jed: window.catalogTest.app.jed,
+      speed: window.catalogTest.app.jedDelta, localStart: new Date(1980, 1).getTime() / 86400000 + 2440587.5 }));
+    assert.equal(playback.jed, 2444270.5, "Latest trial uses the documented UTC JD in a non-UTC browser");
+    assert.equal(playback.speed, 1.5);
+    assert.notEqual(playback.jed, playback.localStart);
+  } finally { await trial.close(); }
   const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
   const errors = [], requests = [];
   page.on("pageerror", error => errors.push(error.message));

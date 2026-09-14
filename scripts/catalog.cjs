@@ -103,13 +103,15 @@ async function prepareCatalog(configPath, { publicDefaults = false } = {}) {
   for (const key of ["startJed", "speed"]) {
     if (config[key] !== undefined && !Number.isFinite(config[key])) throw new Error("Invalid catalogue " + key + ".");
   }
+  const playback = {};
+  if (config.startJed !== undefined || !publicDefaults) playback.startJed = config.startJed ?? 2444270.5;
+  if (config.speed !== undefined || !publicDefaults) playback.speed = config.speed ?? 1.5;
   if (Object.hasOwn(config, "latest")) {
     if (config.mode !== "indexed" || Object.keys(config).some(key => !["mode", "latest", "startJed", "speed"].includes(key))) {
       throw new Error("Latest catalogue selection accepts indexed mode, latest URL and optional date/speed only.");
     }
     const { validateLatestURL } = await import("../src/js/catalog/contract.js");
-    const runtime = { mode: "indexed", latest: validateLatestURL(config.latest).href };
-    for (const key of ["startJed", "speed"]) if (config[key] !== undefined) runtime[key] = config[key];
+    const runtime = { mode: "indexed", latest: validateLatestURL(config.latest).href, ...playback };
     return { staged: [], runtime };
   }
   if (config.retained !== undefined && !Array.isArray(config.retained)) throw new Error("retained must be an array of pinned bundles.");
@@ -125,9 +127,7 @@ async function prepareCatalog(configPath, { publicDefaults = false } = {}) {
     const item = await stageVerifiedBundle(source, input.pin, cache, await verifyBundle(source, input.pin));
     if (!staged.some(other => other.pin.sha256 === input.pin.sha256)) staged.push({ ...item, pin: input.pin });
   }
-  const runtime = { pin: { ...config.pin, url: "data/" + path.basename(staged[0].directory) + "/index.json" }, mode: config.mode };
-  if (config.startJed !== undefined || !publicDefaults) runtime.startJed = config.startJed ?? 2444270.5;
-  if (config.speed !== undefined || !publicDefaults) runtime.speed = config.speed ?? 1.5;
+  const runtime = { pin: { ...config.pin, url: "data/" + path.basename(staged[0].directory) + "/index.json" }, mode: config.mode, ...playback };
   return { staged, runtime };
 }
 

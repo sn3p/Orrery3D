@@ -245,7 +245,7 @@ test("shared runtime build needs no local bundle or data host and emits no histo
   assert((await fs.readFile(path.join(root, "dist/bundle.js"), "utf8")).includes(latest));
   await assert.rejects(fs.stat(path.join(root, "dist/data")), { code: "ENOENT" });
   const { prepareCatalog } = require("../scripts/catalog.cjs");
-  assert.deepEqual(await prepareCatalog(config), { staged: [], runtime: { mode: "indexed", latest } });
+  assert.deepEqual(await prepareCatalog(config, { publicDefaults: true }), { staged: [], runtime: { mode: "indexed", latest } });
   for (const invalid of [
     { mode: "whole", latest }, { mode: "indexed", latest, pin }, { mode: "indexed", latest, retained: [] },
     { mode: "indexed", latest, bundle: "missing" }, { mode: "indexed", latest: "http://example.com/latest.json" },
@@ -253,6 +253,29 @@ test("shared runtime build needs no local bundle or data host and emits no histo
     await fs.writeFile(config, JSON.stringify(invalid));
     await assert.rejects(prepareCatalog(config));
   }
+});
+
+test("latest trials share deterministic playback defaults with pinned trials and preserve public defaults", async t => {
+  const directory = await temporary(t), config = path.join(directory, "config.json");
+  const latest = "http://127.0.0.1:9/latest.json", { prepareCatalog } = require("../scripts/catalog.cjs");
+  for (const source of [{ latest }, { bundle: path.join(fixtures, "ties"), pin }]) {
+    for (const overrides of [{}, { startJed: 2451544.5, speed: 0 }]) {
+      await fs.writeFile(config, JSON.stringify({ mode: "indexed", ...source, ...overrides }));
+      const trial = (await prepareCatalog(config)).runtime;
+      assert.equal(trial.startJed, overrides.startJed ?? 2444270.5);
+      assert.equal(trial.speed, overrides.speed ?? 1.5);
+      const app = (await prepareCatalog(config, { publicDefaults: true })).runtime;
+      assert.equal(app.startJed, overrides.startJed);
+      assert.equal(app.speed, overrides.speed);
+    }
+  }
+  await fs.writeFile(config, JSON.stringify({ mode: "indexed", latest }));
+  const result = await command(npmArgs(["run", "catalog:build", "--", config, path.join(directory, "site")]),
+    { TZ: "Pacific/Honolulu" });
+  assert.equal(result.code, 0, result.output);
+  const built = JSON.parse(result.output.slice(result.output.indexOf("{")));
+  assert.equal(built.runtime.startJed, 2444270.5);
+  assert.equal(built.runtime.speed, 1.5);
 });
 
 test("production source changes preserve every prior asset on a late compilation failure", async t => {
