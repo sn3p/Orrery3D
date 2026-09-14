@@ -45,7 +45,8 @@ npm run catalog:serve
 Open the printed URL. The server binds to localhost on port 3002; set `PORT` to
 choose another available port. It serves HTTP gzip for JSON/app assets, including
 the original catalog sidecars. Change mode to `whole` and rebuild for the
-comparison. Rebuild after source/config changes; this trial server does not watch.
+comparison. Rebuild and restart the server after source/config changes; this
+trial server does not watch and caches compressed app assets for its lifetime.
 The normal `npm run serve` still runs the historical app.
 
 ## Data flow and verification
@@ -53,7 +54,8 @@ The normal `npm run serve` still runs the historical app.
 1. The local provisioner verifies the trusted index before using its references.
    It validates bundle inventory, every hash/length, gzip/decoded agreement,
    export metadata, notices and checksums.
-2. It stages files in `.context/catalog-cache/delivery-v1-HASH/`.
+2. It stages files in `.context/catalog-cache/delivery-v1-HASH/`, repairing a
+   damaged generated cache only after its replacement has been verified.
    Webpack makes a clean source build in `.context/catalog-site/`.
 3. Original files are copied to the site's `data/delivery-v1-HASH/` **after**
    cleaning and verified again. Data and generated output stay outside Git.
@@ -66,14 +68,22 @@ The normal `npm run serve` still runs the historical app.
    including finished results awaiting commitment. Pause/hidden cancels
    unnecessary lookahead.
 6. An incomplete future population holds the last complete date without changing
-   speed. Recovery resets elapsed-time accounting. Reverse uses retained arrays,
-   and graphics restoration uploads those arrays again.
+   speed. Recovery resets elapsed-time accounting. Required reads survive a pause
+   that removes only lookahead. Exhausted speculative reads can recover when
+   their records become necessary, on resumption, or when connectivity returns.
+   Preparation errors have distinct status and are not retried as downloads.
+   Reverse uses retained arrays, and graphics restoration uploads those arrays
+   again; graphics commitment requires an actual asteroid render callback.
 
 Indexed mode bounds transient file/record memory. Both modes preallocate the
 entire population: **57,338,240 CPU bytes plus 35,836,400 GPU bytes** for this pin,
 before app/temporary allocations. Three.js uploads full attribute arrays on
 first use; subsequent append uploads use component ranges. Preparation stays on
-the main thread. File parsing and consumer preparation run in separate tasks, with the processing slot held across both, after a repeat exposed a combined 58 ms task. Preparation and buffer commitment remain synchronous at the same epoch. A worker remains a later option if individual operations exceed the budget.
+the main thread. File parsing and consumer preparation run in separate tasks,
+with the processing slot held across both, after a repeat exposed a combined
+58 ms task. Browser task boundaries use posted messages to avoid timer clamping.
+Preparation and buffer commitment remain synchronous at the same epoch. A worker
+remains a later option if individual operations exceed the budget.
 
 `npm test` exercises producer request/error vectors and the real browser
 loader: ties, cancellation, replacement, buffering, retries, empty profiles,
@@ -83,6 +93,8 @@ workflow remains. Small fixtures need no producer installation or downloaded dat
 ## Measurements
 
 See the [trial results](catalog-trial-results.md) for measured outcomes and remaining rollout checks.
+The [implementation review response](catalog-trial-review-response.md) records
+the subsequent correctness and recovery fixes.
 
 ```sh
 npm run catalog:benchmark -- .context/catalog-config.json

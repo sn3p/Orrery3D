@@ -6,7 +6,36 @@ control fails the startup and loading-task budgets. This supports continuing wit
 indexed delivery; it does **not** establish readiness for a public Pages switch.
 The historical 100,000-object catalog remains the normal build's default.
 
-## Final measurements — September 14, 2026
+## Review follow-up measurements — September 14, 2026
+
+After the [implementation review fixes](catalog-trial-review-response.md), the
+same full-data benchmark was repeated once for normal playback, maximum speed
+and a final-date start. The original measurements below remain historical evidence.
+
+| Follow-up case | Result |
+|---|---|
+| Normal playback, 10 Mbps / 100 ms | First complete GPU scene **1.31 s**; retained CPU **62.54 MB**; sampled peak **106.90 MB** |
+| Catalog work | Longest operation **30.7 ms**; no catalog-associated task over 50 ms observed |
+| Origin bodies at 30 / 60 / 120 seconds | **1.91 / 2.21 / 25.09 MB**; **34.92 MB** after the separate final-date jump |
+| Buffering in the normal 120-second run | **0.40 s**; subsequent final-date jump **9.58 s** |
+| Maximum speed over 60 seconds | First scene **1.27 s**; **18.30 s** buffering; complete population reached |
+| Starting at the final date | First complete scene **34.68 s** |
+
+All three runs reported no browser errors or catalog-associated long task over
+50 ms. A page-wide 62 ms startup task in the normal run did not overlap a measured
+catalog operation. These are single follow-up runs, not additional three-run
+certification of every scenario. The late-start and fast-playback limitations
+remain. Hardware, browser, pin and measurement limitations are unchanged.
+
+Raw reports: `.context/catalog-trial/review-playback.json`, `review-fast.json`,
+and `review-late.json`. The normal-playback measurement bundle SHA-256 is
+`57df33575c0ff58512aff8ce802bfac795d8ab841b39ee7cdfcaa81cd31bc1d7`.
+Source is PR30's initial commit `989e00f` plus the review follow-up diff.
+The follow-up also passed all **10 Node tests** and the complete
+**Chromium/Firefox/WebKit** suite, including the new recovery regressions and
+the shader-test context reuse assertion.
+
+## Initial trial measurements — September 14, 2026
 
 Cold Chrome 151.0.7922.170, Apple M3 Max (14 logical CPUs, 36 GiB RAM),
 1280×800, DPR 1, HTTP gzip, 10 Mbps / 100 ms emulated networking. Both modes use

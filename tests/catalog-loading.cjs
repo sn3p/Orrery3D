@@ -101,7 +101,9 @@ async function run(browser, base, output, name) {
       await page.waitForFunction(() => !window.catalogTest.app.catalogLoader.request);
 
       // Explicit late jump, full commitment, reverse and committed-only rebase.
-      await page.evaluate(() => { const app = window.catalogTest.app; app.autoRender = true; app.jed = 9999999; });
+      await page.evaluate(() => { const app = window.catalogTest.app; app.jed = 9999999; app.renderFrame(); });
+      await page.waitForFunction(() => window.catalogTest.app.catalogLoader.committedCount === 6);
+      await page.evaluate(() => window.catalogTest.app.renderFrame());
       await page.waitForFunction(() => window.catalogTest.app.asteroidsDiscovered === 6);
       const packed = await page.evaluate(async () => {
         const { app, prepareCatalogue } = window.catalogTest;
@@ -114,7 +116,7 @@ async function run(browser, base, output, name) {
           slots: app.catalogLoader.source.slots.active };
       });
       assert.deepEqual(packed, { match: true, capacity: 6, committed: 6, slots: 0 });
-      await page.evaluate(date => { window.catalogTest.app.jed = date; }, tie.through);
+      await page.evaluate(date => { const app = window.catalogTest.app; app.jed = date; app.renderFrame(); app.autoRender = true; }, tie.through);
       await page.waitForFunction(() => window.catalogTest.app.asteroidsDiscovered === 4);
       assert(await page.locator("#orrery-status").isHidden());
       await require("./options.cjs").openOptions(page);
@@ -314,6 +316,7 @@ async function run(browser, base, output, name) {
       }
     } finally { releaseIndex?.(); await opening.close(); }
   }
+  results.push(...await require("./catalog-review.cjs").run(browser, base, output, name));
   return results;
 }
 

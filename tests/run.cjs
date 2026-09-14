@@ -242,6 +242,7 @@ async function main() {
           app.gui.gui.updateDisplay();
           return { timing, catalog: catalog.length, fresh, faded, instant, hidden };
         });
+        await require("./catalog-review.cjs").runNative(browser, url, output, name);
         result.catalogLoading = catalogLoading;
         result.sharedFrames = sharedFrames;
         result.fps = fps;
@@ -259,7 +260,19 @@ async function main() {
         result.pausedLifecycle = pausedLifecycle;
         result.catalogueReplacement = catalogueReplacement;
         result.phaseUploads = phaseUploads;
-        result.shader = await page.evaluate(() => window.test.validateShader(window.test.app, window.test.catalog));
+        result.shader = await page.evaluate(() => {
+          const contexts = new Set(), original = HTMLCanvasElement.prototype.getContext;
+          HTMLCanvasElement.prototype.getContext = function(type, ...args) {
+            const context = original.call(this, type, ...args);
+            if (type === "webgl2" && context) contexts.add(context);
+            return context;
+          };
+          try {
+            const result = window.test.validateShader(window.test.app, window.test.catalog);
+            if (contexts.size !== 1) throw new Error("Shader validation must reuse one native context.");
+            return result;
+          } finally { HTMLCanvasElement.prototype.getContext = original; }
+        });
         diagnostics.stage(`${name}: controls, layout and context recovery`);
         await require("./options.cjs").openOptions(page);
         const speed = page.getByRole("textbox", { name: "Playback speed" });

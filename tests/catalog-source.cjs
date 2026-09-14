@@ -64,6 +64,49 @@ test("a verified file yields to the event loop before consumer preparation", asy
   }
 });
 
+test("browser task yields use posted messages and reads do not require AbortSignal.any", async t => {
+  const { default: Source } = await import("../src/js/catalog/CatalogSource.js");
+  const NativeMessageChannel = require("node:worker_threads").MessageChannel;
+  const windowDescriptor = Object.getOwnPropertyDescriptor(globalThis, "window");
+  const channelDescriptor = Object.getOwnPropertyDescriptor(globalThis, "MessageChannel");
+  const anyDescriptor = Object.getOwnPropertyDescriptor(AbortSignal, "any");
+  let channels = 0, closedPorts = 0;
+  globalThis.window = {};
+  globalThis.MessageChannel = class extends NativeMessageChannel {
+    constructor() {
+      super(); channels++;
+      for (const port of [this.port1, this.port2]) {
+        const close = port.close.bind(port);
+        port.close = () => { closedPorts++; close(); };
+      }
+    }
+  };
+  Object.defineProperty(AbortSignal, "any", { configurable: true, value: undefined });
+  t.after(() => {
+    for (const [object, key, descriptor] of [[globalThis, "window", windowDescriptor],
+      [globalThis, "MessageChannel", channelDescriptor], [AbortSignal, "any", anyDescriptor]]) {
+      if (descriptor) Object.defineProperty(object, key, descriptor); else delete object[key];
+    }
+  });
+  const host = await server(t);
+  const source = await Source.open(host.pin(), { mode: "whole" });
+  t.after(() => source.close());
+  assert.equal((await collect(source.read({ start: 0, end: 6 }))).at(-1).type, "complete");
+  assert.equal(channels, 2);
+  assert.equal(closedPorts, 4, "Posted-message ports are released after each task");
+
+  const cancelled = new AbortController();
+  cancelled.abort();
+  await assert.rejects(collect(source.read({ start: 0, end: 6 }, { signal: cancelled.signal })), { name: "AbortError" });
+  let release;
+  host.overrides.set("/ties/full/catalog.json", { wait: new Promise(resolve => { release = resolve; }) });
+  const controller = new AbortController();
+  const pending = collect(source.read({ start: 0, end: 6 }, { signal: controller.signal }));
+  const rejected = assert.rejects(pending, { name: "AbortError" });
+  await delay(20); controller.abort(); await rejected; release();
+  assert.equal(source.slots.active, 0);
+});
+
 test("all producer queries, ranges, empty and invalid requests in both modes, root/subpath and HTTP gzip", async t => {
   const { default: Source } = await import("../src/js/catalog/CatalogSource.js");
   for (const gzip of [false, true]) for (const prefix of ["", "/Orrery3D"]) {
@@ -205,7 +248,7 @@ test("read ordering, two global processing slots, abort isolation, opening lifet
   await assert.rejects(Source.open(host.pin(), { signal: preAborted.signal }), { name: "AbortError" });
 });
 
-test("original complete bundle provision and clean assembly verification reject altered sidecars", async t => {
+test("bundle verification rejects corruption and provisioning repairs stale generated copies", async t => {
   const { stageBundle, verifyBundle } = require("../scripts/catalog.cjs");
   const destination = await fs.mkdtemp(path.join(require("node:os").tmpdir(), "orrery-catalog-"));
   t.after(() => fs.rm(destination, { recursive: true, force: true }));
@@ -217,8 +260,39 @@ test("original complete bundle provision and clean assembly verification reject 
     await stageBundle(path.join(fixtures, name), pin, destination);
     await fs.appendFile(path.join(staged, "full/NOTICE.txt"), "changed");
     await assert.rejects(verifyBundle(staged, pin), /checksum/);
-    await assert.rejects(stageBundle(path.join(fixtures, name), pin, destination), /checksum/);
+    assert.equal(await stageBundle(path.join(fixtures, name), pin, destination), staged);
+    await verifyBundle(staged, pin);
+    await fs.rm(path.join(staged, "index.json"));
+    assert.equal(await stageBundle(path.join(fixtures, name), pin, destination), staged);
+    await verifyBundle(staged, pin);
+
+    const broken = path.join(destination, "broken-" + name);
+    await fs.cp(path.join(fixtures, name), broken, { recursive: true });
+    await fs.appendFile(path.join(broken, "full/NOTICE.txt"), "changed");
+    await assert.rejects(stageBundle(broken, pin, path.join(destination, "other-cache")), /checksum/);
+    await assert.rejects(stageBundle(broken, pin, destination), /checksum/);
+    await verifyBundle(staged, pin);
+    assert(!(await fs.readdir(destination)).some(name => name.startsWith(".staging-")));
   }
+});
+
+test("trial assembly retains unrelated webpack defines while replacing the trial setting", async t => {
+  const { buildTrial, verifyBundle } = require("../scripts/catalog.cjs");
+  const webpack = require("webpack"), base = require("../webpack.config.js");
+  const directory = await fs.mkdtemp(path.resolve(__dirname, "../.context/define-preservation-"));
+  const entry = path.join(directory, "entry.js"), config = path.join(directory, "config.json");
+  const originalPlugins = base.plugins;
+  base.plugins = base.plugins.map(plugin => plugin instanceof webpack.DefinePlugin
+    ? new webpack.DefinePlugin({ ...plugin.definitions, __SAME_PLUGIN_DEFINE__: '"same plugin"' }) : plugin);
+  base.plugins.push(new webpack.DefinePlugin({ __OTHER_PLUGIN_DEFINE__: '"other plugin"' }));
+  t.after(async () => { base.plugins = originalPlugins; await fs.rm(directory, { recursive: true, force: true }); });
+  await fs.writeFile(entry, "globalThis.catalogDefinitions = [__SAME_PLUGIN_DEFINE__, __OTHER_PLUGIN_DEFINE__, __CATALOG_TRIAL__.mode];");
+  await fs.writeFile(config, JSON.stringify({ bundle: path.join(fixtures, "ties"), pin: cases.bundles.ties.pin, mode: "indexed" }));
+  const result = await buildTrial(config, path.join(directory, "site"), { entry });
+  const context = {};
+  require("node:vm").runInNewContext(await fs.readFile(path.join(result.output, "bundle.js"), "utf8"), context);
+  assert.equal(JSON.stringify(context.catalogDefinitions), JSON.stringify(["same plugin", "other plugin", "indexed"]));
+  await verifyBundle(result.bundle, cases.bundles.ties.pin);
 });
 
 test("trial clean output rejects source and input locations before building", async t => {

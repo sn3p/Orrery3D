@@ -6,7 +6,28 @@ const check = signal => { if (signal?.aborted) throw aborted(); };
 // Digest completion is a microtask. Keep file parsing and consumer preparation
 // in separate tasks: otherwise individually bounded phases can combine into a
 // long task. The processing slot remains held across these scheduling points.
-const nextTask = () => new Promise(resolve => setTimeout(resolve, 0));
+const nextTask = () => new Promise(resolve => {
+  // Posted messages keep a task boundary without background-tab timer clamping.
+  // Node's timer fallback also lets command-line consumers exit naturally.
+  if (typeof window === "undefined" || typeof MessageChannel === "undefined") {
+    setTimeout(resolve, 0);
+    return;
+  }
+  const channel = new MessageChannel();
+  channel.port1.onmessage = () => {
+    channel.port1.close(); channel.port2.close(); resolve();
+  };
+  channel.port2.postMessage(null);
+});
+
+// Link only this read's lifetime; remove the listeners on completion as well as
+// cancellation. This also supports browsers without AbortSignal.any.
+function linkCancellation(controller, signals) {
+  if (signals.some(signal => signal.aborted)) { controller.abort(); return () => {}; }
+  const cancel = () => controller.abort();
+  for (const signal of signals) signal.addEventListener("abort", cancel, { once: true });
+  return () => { for (const signal of signals) signal.removeEventListener("abort", cancel); };
+}
 
 // The slot lasts until the consumer resumes after yielding, so verified records
 // waiting for ordered commitment count toward the same bound as network work.
@@ -95,8 +116,8 @@ export default class CatalogSource {
     requireValue(Number.isSafeInteger(start) && Number.isSafeInteger(end)
       && 0 <= start && start <= end && end <= this.info.counts.discovery_export, "read range");
     const controller = new AbortController();
-    const combined = AbortSignal.any([controller.signal, this.lifetime.signal, ...(signal ? [signal] : [])]);
-    check(combined);
+    const combined = controller.signal;
+    const unlink = linkCancellation(controller, [this.lifetime.signal, ...(signal ? [signal] : [])]);
     const identity = { catalogId: this.info.catalog_id, sourceId: this.sourceId };
     const files = start === end ? [] : this.files.filter(file => file.end > start && file.start < end);
     const pending = [];
@@ -129,6 +150,7 @@ export default class CatalogSource {
       })().catch(error => ({ error })));
     };
     try {
+      check(combined);
       enqueue(); enqueue();
       while (pending.length) {
         let result = await pending.shift();
@@ -146,7 +168,7 @@ export default class CatalogSource {
       }
       check(combined);
       yield { type: "complete", ...identity, start, end };
-    } finally { controller.abort(); }
+    } finally { controller.abort(); unlink(); }
   }
 
   close() {

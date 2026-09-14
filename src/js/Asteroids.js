@@ -109,8 +109,10 @@ export default class Asteroids extends THREE.Points {
       for (let i = 0; i < this.committedCount; i++) {
         meanAnomaly.array[i] = wrapPhase(this.phases[i * 2] + this.phases[i * 2 + 1] * (jed - REFERENCE_JED));
       }
-      meanAnomaly.addUpdateRange(0, this.committedCount);
-      meanAnomaly.needsUpdate = true;
+      if (this.committedCount) {
+        meanAnomaly.addUpdateRange(0, this.committedCount);
+        meanAnomaly.needsUpdate = true;
+      }
       this.epoch = jed;
     }
     this.uniforms.orbitTime.value = jed - this.epoch;

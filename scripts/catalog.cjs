@@ -69,25 +69,32 @@ async function verifyBundle(directory, pin) {
 }
 
 async function stageBundle(source, pin, destinationRoot = cache) {
+  return (await stageVerifiedBundle(source, pin, destinationRoot, await verifyBundle(source, pin))).directory;
+}
+
+async function stageVerifiedBundle(source, pin, destinationRoot, verified) {
   source = path.resolve(source);
   destinationRoot = path.resolve(destinationRoot);
   if (source === destinationRoot || destinationRoot.startsWith(source + path.sep)
     || source.startsWith(destinationRoot + path.sep)) throw new Error("Source and staging directories must be disjoint.");
-  const { names } = await verifyBundle(source, pin);
+  const { names } = verified;
   await fs.mkdir(destinationRoot, { recursive: true });
   const destination = path.join(destinationRoot, "delivery-v1-" + pin.sha256);
-  try { await fs.access(destination); await verifyBundle(destination, pin); return destination; }
-  catch (error) { if (error.code !== "ENOENT") throw error; }
+  try { return { directory: destination, verified: await verifyBundle(destination, pin) }; }
+  catch { /* A missing, incomplete or corrupt generated cache is replaceable. */ }
   const temp = await fs.mkdtemp(path.join(destinationRoot, ".staging-"));
   try {
     for (const name of names) {
       await fs.mkdir(path.dirname(path.join(temp, name)), { recursive: true });
       await fs.copyFile(path.join(source, name), path.join(temp, name));
     }
-    await verifyBundle(temp, pin);
+    verified = await verifyBundle(temp, pin);
+    // Keep the old cache until its replacement is verified. Invalid source
+    // files must never destroy an existing usable cache or deployment copy.
+    await fs.rm(destination, { force: true, recursive: true });
     await fs.rename(temp, destination);
   } finally { await fs.rm(temp, { force: true, recursive: true }); }
-  return destination;
+  return { directory: destination, verified };
 }
 
 async function buildTrial(configPath, output = path.join(root, ".context/catalog-site"), { entry = "./src/index.js" } = {}) {
@@ -109,12 +116,13 @@ async function buildTrial(configPath, output = path.join(root, ".context/catalog
     try { if ((await fs.lstat(directory)).isSymbolicLink()) throw new Error("Trial output must not traverse symlinks."); }
     catch (error) { if (error.code !== "ENOENT") throw error; }
   }
-  const staged = await stageBundle(source, config.pin);
+  const staged = await stageVerifiedBundle(source, config.pin, cache, await verifyBundle(source, config.pin));
   const webpack = require("webpack"), base = require("../webpack.config.js");
-  const runtime = { pin: { ...config.pin, url: "data/" + path.basename(staged) + "/index.json" },
+  const runtime = { pin: { ...config.pin, url: "data/" + path.basename(staged.directory) + "/index.json" },
     mode: config.mode, startJed: config.startJed ?? 2444270.5, speed: config.speed ?? 1.5 };
-  const plugins = base.plugins.filter(plugin => !(plugin instanceof webpack.DefinePlugin));
-  plugins.push(new webpack.DefinePlugin({ __CATALOG_TRIAL__: JSON.stringify(runtime) }));
+  const plugins = base.plugins.map(plugin => plugin instanceof webpack.DefinePlugin
+    && Object.hasOwn(plugin.definitions, "__CATALOG_TRIAL__")
+    ? new webpack.DefinePlugin({ ...plugin.definitions, __CATALOG_TRIAL__: JSON.stringify(runtime) }) : plugin);
   await new Promise((resolve, reject) => {
     const compiler = webpack({ ...base, mode: "production", plugins, entry,
       output: { ...base.output, path: path.resolve(output), clean: true } });
@@ -125,8 +133,9 @@ async function buildTrial(configPath, output = path.join(root, ".context/catalog
   });
   // The cache survives webpack's clean. Copy original sidecars/provenance
   // afterward, then verify in the final deployment path.
-  const deployed = await stageBundle(staged, config.pin, path.join(path.resolve(output), "data"));
-  return { output: path.resolve(output), bundle: deployed, runtime };
+  const deployed = await stageVerifiedBundle(staged.directory, config.pin,
+    path.join(path.resolve(output), "data"), staged.verified);
+  return { output: path.resolve(output), bundle: deployed.directory, runtime };
 }
 
 module.exports = { verifyBundle, stageBundle, buildTrial, hashFile };

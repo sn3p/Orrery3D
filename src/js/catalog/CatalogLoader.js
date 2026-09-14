@@ -26,6 +26,8 @@ export default class CatalogLoader {
     this.graphicsValid = false;
     this.initialRendered = false;
     this.error = null;
+    this.errorKind = null;
+    this.failedRequiredCount = 0;
     this.failures = 0;
   }
 
@@ -51,13 +53,22 @@ export default class CatalogLoader {
 
   demand(date, { playing = this.playing, hidden = this.hidden } = {}) {
     if (this.disposed || !this.source) return false;
-    this.source.countThrough(date); // Validate even if it is the same date.
+    const required = this.source.countThrough(date);
+    const resume = (!this.playing && playing) || (this.hidden && !hidden);
     this.date = date;
     this.playing = playing;
     this.hidden = hidden;
-    if (this.request && this.request.end > this.targetEnd()) this.request.controller.abort();
+    this.cancelUnneededRead();
+    // A speculative failure gets a fresh bounded attempt once those records
+    // become necessary. Recovery signals may also retry a required read, but
+    // repeated frames at the same blocked date cannot create a retry loop.
+    if (this.errorKind === "read" && ((this.buffering && required > this.failedRequiredCount) || resume)) this.retry();
     this.pump();
     return this.readyToDraw(date);
+  }
+
+  cancelUnneededRead() {
+    if (this.request && this.request.end > this.targetEnd() && !this.buffering) this.request.controller.abort();
   }
 
   targetEnd() {
@@ -85,6 +96,7 @@ export default class CatalogLoader {
     this.commitCloud(event);
     this.committedCount = event.end;
     this.failures = 0;
+    this.cancelUnneededRead();
     this.changed();
     return true;
   }
@@ -109,7 +121,17 @@ export default class CatalogLoader {
       try {
         for await (const event of source.read({ start, end }, { signal: controller.signal })) {
           if (generation !== this.generation || this.disposed) break;
-          if (event.type === "batch") this.accept(event, generation);
+          if (event.type === "batch") {
+            try { this.accept(event, generation); }
+            catch (error) {
+              // Valid producer data may exceed this renderer's Float32 limits.
+              // Re-fetching cannot fix preparation or commitment exceptions.
+              this.error = error;
+              this.errorKind = "commit";
+              this.changed();
+              return;
+            }
+          }
         }
       } catch (error) {
         if (generation !== this.generation || this.disposed || error.name === "AbortError") return;
@@ -119,7 +141,11 @@ export default class CatalogLoader {
             this.retryTimer = null;
             if (generation === this.generation && !this.disposed) this.pump();
           }, delay);
-        } else this.error = error;
+        } else {
+          this.error = error;
+          this.errorKind = "read";
+          this.failedRequiredCount = this.requiredCount;
+        }
         this.changed();
       } finally {
         if (generation === this.generation && this.request === request) {
@@ -131,8 +157,9 @@ export default class CatalogLoader {
   }
 
   retry() {
-    if (this.disposed) return;
+    if (this.disposed || this.errorKind === "commit") return;
     this.error = null;
+    this.errorKind = null;
     this.failures = 0;
     clearTimeout(this.retryTimer);
     this.retryTimer = null;
