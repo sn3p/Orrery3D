@@ -50,13 +50,27 @@ function npmArgs(args) {
   return [cli, ...args];
 }
 
-test("the ordinary app selects the full indexed catalogue without a local override", async () => {
+test("the ordinary app builds the hosted indexed catalogue without local data or network access", async t => {
+  const directory = await temporary(t), preload = path.join(directory, "offline-build.cjs");
+  await fs.writeFile(preload, `
+    globalThis.fetch = () => { throw new Error("App builds must not fetch catalogue data"); };
+    const fs = require("node:fs/promises"), readFile = fs.readFile;
+    fs.readFile = async (filename, ...args) => {
+      if (String(filename).includes("/.context/catalog-")) throw new Error("App builds must not read a local catalogue cache");
+      return readFile(filename, ...args);
+    };
+  `);
+  const built = await command(npmArgs(["run", "build", "--", "--output-clean"]),
+    { NODE_OPTIONS: `--require ${JSON.stringify(preload)}` });
+  assert.equal(built.code, 0, built.output);
   const result = await command(["-e", 'process.stdout.write(require("./scripts/catalog-selection.cjs")())']);
   assert.equal(result.code, 0, result.output);
   assert.equal(result.output, path.join(root, "catalog.config.json"));
   const config = JSON.parse(await fs.readFile(result.output, "utf8"));
   assert.equal(config.mode, "indexed", "Normal commands must not return to the historical 100,000-object selection");
-  assert.equal(config.pin.sha256, "bf4252e0e20b6db07df83a2d87f731788235067fbcd2d3a78c98f92083880db2");
+  assert.deepEqual(config, { mode: "indexed", latest: "https://sn3p.github.io/orrery-data/latest.json" });
+  assert((await fs.readFile(path.join(root, "dist/bundle.js"), "utf8")).includes(config.latest));
+  await assert.rejects(fs.stat(path.join(root, "dist/data")), { code: "ENOENT" });
   assert(!Object.hasOwn(config, "startJed"), "Keep the browser-local public starting date");
   assert(!Object.hasOwn(config, "speed"), "Keep the public playback speed");
 });

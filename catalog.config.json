@@ -1,9 +1,4 @@
 {
   "mode": "indexed",
-  "bundle": ".context/catalog-downloads/delivery-v1-bf4252e0e20b6db07df83a2d87f731788235067fbcd2d3a78c98f92083880db2",
-  "pin": {
-    "url": "index.json",
-    "bytes": 265372,
-    "sha256": "bf4252e0e20b6db07df83a2d87f731788235067fbcd2d3a78c98f92083880db2"
-  }
+  "latest": "https://sn3p.github.io/orrery-data/latest.json"
 }
