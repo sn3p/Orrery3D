@@ -128,17 +128,25 @@ These local results do not establish actual Pages delivery or phone performance.
 
 ## Before public rollout
 
-Pinned acquisition, verified assembly and retained-version rollback are implemented.
-Providing a portable catalogue source and verifying hosted compression, failure
-and update behavior remain outstanding. See the delivery document for the latest
-user direction: manually refreshed current data without required release retention.
-The Pages job reads the normal tracked catalogue selection; its current local
-source must become available to a fresh CI build. To verify assembly locally in the normal output directory:
+The tracked default now uses the published `orrery-data` browser distribution.
+Clean build/serve/watch commands require no local catalogue or data-host access.
+Live loading, decoded hashes, gzip and CORS were verified in the browser; the
+three-browser fixture workflows cover failures, source replacement and reload.
+The GitHub build and all three browser suites pass with the hosted default.
+See [catalogue delivery](catalog-delivery.md#verification-and-remaining-rollout-limits)
+for current behavior and limits: the public app needs a smoke check after this
+PR's deployment, and physical-phone performance remains unverified. Producer
+refreshes may stay manual; release retention is not required.
+
+Optional pinned acquisition, verified assembly and retained-version rollback
+remain available for complete-bundle comparisons. To verify such an assembly
+locally in the normal output directory:
 
 ```sh
 npm run catalog:build -- .context/catalog-config.json dist
 ```
 
 This replaces local generated `dist/`; `npm run build -- --output-clean` rebuilds
-the normal tracked selection. It does not deploy. Historical rollback must be
-selected explicitly as described in the delivery documentation.
+the normal tracked shared-source selection. It does not deploy. Historical mode
+and its rollback option have been removed; the old dataset is only a renderer
+test fixture.
