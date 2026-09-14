@@ -23,7 +23,15 @@ module.exports = async (env, argv = {}) => {
     if (compiler.options.devServer?.static?.directory !== expectedOutput) {
       throw new Error("Configured catalogue development must serve static files from dist/.");
     }
-    compiler.hooks.afterEmit.tapPromise("VerifiedCatalogueFiles", () => stageCatalog(prepared, compiler.outputPath));
+    let staged = false;
+    compiler.hooks.afterEmit.tapPromise("VerifiedCatalogueFiles", async () => {
+      // Selection is fixed for this process. Only an enabled output cleaner
+      // can invalidate staged files during ordinary watch recompilations.
+      if (!staged || compiler.options.output.clean) {
+        await stageCatalog(prepared, compiler.outputPath);
+        staged = true;
+      }
+    });
   } };
   return { ...base, plugins: [...catalogPlugins(base, prepared.runtime), data] };
 };

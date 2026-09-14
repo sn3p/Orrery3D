@@ -255,6 +255,36 @@ test("shared runtime build needs no local bundle or data host and emits no histo
   }
 });
 
+test("bare historical production rollback preserves every prior asset on a late compilation failure", async t => {
+  const directory = await temporary(t), config = path.join(directory, "config.json");
+  const output = path.join(root, "dist");
+  await fs.writeFile(config, JSON.stringify({ mode: "indexed", latest: "http://127.0.0.1:9/latest.json" }));
+  const initial = await command(npmArgs(["run", "build"]), { CATALOG_CONFIG: config });
+  assert.equal(initial.code, 0, initial.output);
+  await fs.writeFile(path.join(output, "previous-site.txt"), "Preserve the entire working site.");
+  const inventory = async () => {
+    const names = (await fs.readdir(output, { recursive: true, withFileTypes: true }))
+      .filter(item => item.isFile()).map(item => path.relative(output, path.join(item.parentPath, item.name))).sort();
+    return Promise.all(names.map(async name => ({ name, ...await hashFile(path.join(output, name)) })));
+  };
+  const before = await inventory();
+  await fs.writeFile(config, JSON.stringify({ mode: "historical" }));
+  const preload = path.join(directory, "late-failure.cjs");
+  await fs.writeFile(preload, `require(${JSON.stringify(path.join(root, "webpack.config.js"))}).plugins.push({
+    apply(compiler) { compiler.hooks.afterEmit.tap("SimulatedLateFailure", () => { throw new Error("Simulated late compilation failure"); }); }
+  });`);
+  const failed = await command(npmArgs(["run", "build", "--", "--output-clean"]),
+    { CATALOG_CONFIG: config, NODE_OPTIONS: `--require ${JSON.stringify(preload)}` });
+  assert.notEqual(failed.code, 0);
+  assert.match(failed.output, /Simulated late compilation failure/);
+  assert.deepEqual(await inventory(), before, "Even emitted assets must stay private until the build succeeds");
+  const restored = await command(npmArgs(["run", "build", "--", "--output-clean"]), { CATALOG_CONFIG: config });
+  assert.equal(restored.code, 0, restored.output);
+  assert.deepEqual(await hashFile(path.join(output, "data/catalog.json")), await hashFile(path.join(root, "data/catalog.json")));
+  await assert.rejects(fs.stat(path.join(output, "previous-site.txt")), { code: "ENOENT" });
+  await assert.rejects(fs.stat(output + ".build-lock"), { code: "ENOENT" });
+});
+
 async function eventually(check, message) {
   const deadline = Date.now() + 30000;
   while (Date.now() < deadline) {
@@ -266,17 +296,27 @@ async function eventually(check, message) {
 
 test("standard serve and watch keep the selected pin through source recompilation", async t => {
   const directory = await temporary(t), config = path.join(directory, "config.json"), entry = path.join(directory, "entry.js");
-  for (const selection of [{ bundle: path.join(fixtures, "ties"), pin }, { latest: "http://127.0.0.1:9/latest.json" }]) {
+  const reads = path.join(directory, "reads.log"), preload = path.join(directory, "observe-reads.cjs");
+  await fs.writeFile(preload, `const fs = require("node:fs"), original = fs.createReadStream;
+    fs.createReadStream = function(filename, ...args) {
+      if (String(filename).startsWith(${JSON.stringify(path.join(root, "dist/data") + path.sep)}))
+        fs.appendFileSync(${JSON.stringify(reads)}, String(filename) + "\\n");
+      return original.call(this, filename, ...args);
+    };`);
+  for (const [selection, clean] of [[{ bundle: path.join(fixtures, "ties"), pin }, false],
+    [{ bundle: path.join(fixtures, "ties"), pin }, true], [{ latest: "http://127.0.0.1:9/latest.json" }, false]]) {
     await fs.writeFile(config, JSON.stringify({ ...selection, mode: "indexed" }));
     for (const script of ["serve", "watch"]) {
+      await fs.writeFile(reads, "");
       await fs.writeFile(entry, 'globalThis.deliveryMarker = "delivery-before";');
       const probe = http.createServer();
       await new Promise(resolve => probe.listen(0, "127.0.0.1", resolve));
       const port = probe.address().port;
       await new Promise(resolve => probe.close(resolve));
       const extra = script === "serve" ? ["--host", "127.0.0.1", "--port", String(port), "--no-open"] : [];
+      if (clean) extra.push("--output-clean");
       const child = spawn(process.execPath, npmArgs(["run", script, "--", "--entry-reset", "--entry", "./src/index.js", "--entry", entry, ...extra]),
-        { cwd: root, detached: true, env: { ...process.env, CATALOG_CONFIG: config } });
+        { cwd: root, detached: true, env: { ...process.env, CATALOG_CONFIG: config, NODE_OPTIONS: `--require ${JSON.stringify(preload)}` } });
       let log = "";
       child.stdout.on("data", chunk => { log += chunk; }); child.stderr.on("data", chunk => { log += chunk; });
       const stopped = once(child, "exit");
@@ -289,8 +329,16 @@ test("standard serve and watch keep the selected pin through source recompilatio
           assert.equal(data.status, 200);
           assert.equal((await data.arrayBuffer()).byteLength, pin.bytes);
         }
+        await eventually(() => /compiled successfully/.test(log), script + " did not finish initial staging");
+        const initialReads = await fs.readFile(reads, "utf8"), initialCompilations = log.match(/compiled successfully/g).length;
+        if (!selection.latest) assert(initialReads.length > 0, "Initial staging verifies on-disk data");
         await fs.writeFile(entry, 'globalThis.deliveryMarker = "delivery-after";');
         await eventually(async () => (await app()).includes("delivery-after"), script + " did not rebuild: " + log);
+        await eventually(() => (log.match(/compiled successfully/g) || []).length > initialCompilations,
+          script + " did not finish recompilation");
+        const afterReads = await fs.readFile(reads, "utf8");
+        if (clean) assert(afterReads.length > initialReads.length, "Clean output is staged and verified again");
+        else assert.equal(afterReads, initialReads, "A source-only rebuild must not rehash unchanged catalogue files");
         if (!selection.latest) await verifyBundle(path.join(root, "dist/data/delivery-v1-" + pin.sha256), pin);
         assert((await app()).includes(selection.latest || pin.sha256), "Recompilation retains the configured runtime source");
       } catch (error) { throw new Error(error.message + "\n" + log, { cause: error }); } finally {

@@ -123,7 +123,10 @@ explicit comparison mode. A failed indexed read never selects whole mode.
 Development and watch keep one configuration for the process lifetime;
 restart after changing its URL or local pin. Shared dataset updates need only a
 browser reload. Source edits recompile normally. App assets can live in webpack's
-memory filesystem; complete local bundles are staged in `dist/data/`. Shared
+memory filesystem; complete local bundles are staged and verified in `dist/data/`
+once per process. Recompilations repeat staging only when output cleaning is
+enabled; restart the process after externally deleting/replacing `dist`, or to
+explicitly recheck or repair data. Shared
 runtime selection stages no data. Configured
 serve/watch reject output/static-root overrides, so the cleaner cannot reach an
 input bundle and the data cannot become disconnected from its serving path.
@@ -168,7 +171,8 @@ Both caches are generated conveniences; neither is a release-retention policy.
 
 ## Assembly, retention and rollback
 
-Configured production builds compile into a private sibling directory, then
+All standard production builds, including a bare `historical` selection, compile
+into a private sibling directory, then
 stage and verify all selected/retained bundles **after** webpack cleaning.
 Only a complete successful assembly replaces `dist/`. Compilation and final-copy
 failure leave the previous output intact. Competing builds for the same output
