@@ -21,7 +21,7 @@ nvm install
 nvm use
 ```
 
-The indexed catalogue must first be provisioned as described in [catalogue delivery](docs/catalog-delivery.md); portable latest-data provisioning is pending on this branch. The commands below start the app on port 3000, and `npm run benchmark:serve` starts the benchmark on port 3001. See the [benchmark instructions](benchmarks/README.md) for details.
+The app loads the current indexed catalogue directly from [orrery-data Pages](https://sn3p.github.io/orrery-data/). No local dataset or catalogue provisioning is needed to build or start the app. The commands below start the app on port 3000, and `npm run benchmark:serve` starts the benchmark on port 3001. See the [benchmark instructions](benchmarks/README.md) for details.
 
 Install dependencies:
 
@@ -101,8 +101,7 @@ canceled by GitHub; see the [queue documentation](https://docs.github.com/en/act
 
 `dist/` is generated and ignored. No local build, generated-file commit, or push to `gh-pages` is needed to deploy.
 The workflow uses the indexed selection in `catalog.config.json`. See
-[catalogue delivery](docs/catalog-delivery.md) for provisioning, mode options and
-the pending public download source. Builds do not refresh MPC data.
+[catalogue delivery](docs/catalog-delivery.md) for the shared data source, mode options and optional local comparison bundles. Builds do not refresh MPC data.
 
 To deploy `master` again, open **Actions → GitHub Pages → Run workflow**, select
 `master`, or use the authenticated [GitHub CLI](https://cli.github.com/):
@@ -127,7 +126,7 @@ Normal build, serve and watch commands select the **895,910-object indexed catal
 
 An [import in Orrery](https://github.com/sn3p/Orrery/pull/49) on **12 September 2026** produced **895,910 objects with matching discovery dates** from **1,563,495 orbital records**. The other **667,585** were unnumbered objects without matching discovery records in `NumberedMPs.txt`. These are dated counts that change with MPC updates; see [Orrery issue #47](https://github.com/sn3p/Orrery/issues/47) for the source verification and discovery-date limitation.
 
-Shared catalogue processing and hosting belong to [orrery-data](https://github.com/sn3p/orrery-data). The [delivery configuration](docs/catalog-delivery.md) supports a shared `latest` URL: build only the app, then discover the current index and fetch verified chunks when opened. Reloading picks up published dataset updates without rebuilding the app. The tracked selection still uses the local bundle until the producer's endpoint is published and verified; fresh CI activation remains pending. `whole` remains available for complete-bundle comparisons.
+Shared catalogue processing and hosting belong to [orrery-data](https://github.com/sn3p/orrery-data). The [delivery configuration](docs/catalog-delivery.md) supports a shared `latest` URL: build only the app, then discover the current index and fetch verified chunks when opened. Reloading picks up published dataset updates without rebuilding the app. The tracked selection uses `https://sn3p.github.io/orrery-data/latest.json`; builds need no local dataset or data-host access. `whole` remains available for complete-bundle comparisons.
 
 Larger catalogues increase download, parsing, preparation and memory costs even with GPU rendering. The benchmark's larger counts repeat the bundled records and positions; the catalogue loader exercises the real 895,910-object export, with [recorded loading and memory measurements](docs/catalog-trial-results.md). The current discovery animation requires a finite discovery date for every object.
 
