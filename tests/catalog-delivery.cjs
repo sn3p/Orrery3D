@@ -5,6 +5,7 @@ const path = require("node:path");
 const http = require("node:http");
 const { spawn } = require("node:child_process");
 const { once } = require("node:events");
+const { stripVTControlCharacters } = require("node:util");
 const tar = require("tar");
 const { gzipSync } = require("node:zlib");
 const { acquireArchive, packBundle } = require("../scripts/catalog-archive.cjs");
@@ -356,11 +357,13 @@ test("standard serve and watch keep the selected pin through source recompilatio
       const port = probe.address().port;
       await new Promise(resolve => probe.close(resolve));
       const extra = script === "serve" ? ["--host", "127.0.0.1", "--port", String(port), "--no-open"] : [];
+      extra.push("--color"); // Exercise the coloured webpack output used by CI.
       if (clean) extra.push("--output-clean");
       const child = spawn(process.execPath, npmArgs(["run", script, "--", "--entry-reset", "--entry", "./src/index.js", "--entry", entry, ...extra]),
         { cwd: root, detached: true, env: { ...process.env, CATALOG_CONFIG: config, NODE_OPTIONS: `--require ${JSON.stringify(preload)}` } });
       let log = "";
       child.stdout.on("data", chunk => { log += chunk; }); child.stderr.on("data", chunk => { log += chunk; });
+      const compilations = () => (stripVTControlCharacters(log).match(/compiled successfully/g) || []).length;
       const stopped = once(child, "exit");
       const app = async () => script === "serve" ? (await fetch(`http://127.0.0.1:${port}/bundle.js`)).text()
         : fs.readFile(path.join(root, "dist/bundle.js"), "utf8");
@@ -371,12 +374,12 @@ test("standard serve and watch keep the selected pin through source recompilatio
           assert.equal(data.status, 200);
           assert.equal((await data.arrayBuffer()).byteLength, pin.bytes);
         }
-        await eventually(() => /compiled successfully/.test(log), script + " did not finish initial staging");
-        const initialReads = await fs.readFile(reads, "utf8"), initialCompilations = log.match(/compiled successfully/g).length;
+        await eventually(() => compilations() > 0, script + " did not finish initial staging");
+        const initialReads = await fs.readFile(reads, "utf8"), initialCompilations = compilations();
         if (!selection.latest) assert(initialReads.length > 0, "Initial staging verifies on-disk data");
         await fs.writeFile(entry, 'globalThis.deliveryMarker = "delivery-after";');
         await eventually(async () => (await app()).includes("delivery-after"), script + " did not rebuild: " + log);
-        await eventually(() => (log.match(/compiled successfully/g) || []).length > initialCompilations,
+        await eventually(() => compilations() > initialCompilations,
           script + " did not finish recompilation");
         const afterReads = await fs.readFile(reads, "utf8");
         if (clean) assert(afterReads.length > initialReads.length, "Clean output is staged and verified again");
