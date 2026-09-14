@@ -174,6 +174,7 @@ test("standard build selects configuration, preserves historical asset, and fail
   await fs.writeFile(config, JSON.stringify({ bundle: path.join(fixtures, "ties"), pin, mode: "indexed" }));
   const result = await command(npmArgs(["run", "build", "--", "--output-clean"]), { CATALOG_CONFIG: config });
   assert.equal(result.code, 0, result.output);
+  assert.doesNotMatch(result.output, /MODULE_TYPELESS_PACKAGE_JSON/, "Build must load catalogue modules with an explicit module type");
   await verifyBundle(path.join(root, "dist/data/delivery-v1-" + pin.sha256), pin);
   assert.deepEqual(await hashFile(path.join(root, "dist/data/catalog.json")), await hashFile(path.join(root, "data/catalog.json")));
   const previous = await hashFile(path.join(root, "dist/bundle.js"));
@@ -225,6 +226,7 @@ test("standard serve and watch keep the selected pin through source recompilatio
       try { process.kill(-child.pid, "SIGTERM"); } catch (error) { if (error.code !== "ESRCH") throw error; }
       await stopped;
     }
+    assert.doesNotMatch(log, /MODULE_TYPELESS_PACKAGE_JSON/, script + " must load catalogue modules with an explicit module type");
   }
 });
 
