@@ -104,8 +104,10 @@ input bundle and the data cannot become disconnected from its serving path.
 
 A configuration accepts exactly one `bundle` directory or `archive` object.
 An archive requires a real explicit HTTPS `url`, positive `bytes` and lowercase
-SHA-256 `sha256`. HTTP is permitted only on localhost for transport tests. The
-independent `pin` always identifies the original decoded `index.json`. No `latest`
+SHA-256 `sha256`. HTTP is permitted only on localhost for transport tests. At most
+five redirects are followed, with every destination checked against the same URL
+policy before requesting it; the timeout covers the entire redirect chain and body.
+The independent `pin` always identifies the original decoded `index.json`. No `latest`
 lookup or upstream MPC refresh is performed. Do not put a guessed future URL into
 the tracked selection, or put a developer's local bundle path into CI.
 

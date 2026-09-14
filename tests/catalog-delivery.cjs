@@ -101,6 +101,57 @@ test("a checksum-valid archive still rejects links, duplicate entries and incomp
   }
 });
 
+test("archive redirects validate every destination, support relative chains and stop loops", async t => {
+  const directory = await temporary(t), filename = path.join(directory, "bundle.tar.gz");
+  const digest = await packBundle(path.join(fixtures, "ties"), pin, filename);
+  const body = await fs.readFile(filename), requests = [];
+  let location;
+  const statuses = [301, 302, 303, 307, 308];
+  const server = http.createServer((req, res) => {
+    requests.push(req.url);
+    const step = /^\/chain\/(\d+)$/.exec(req.url);
+    if (step && Number(step[1]) < statuses.length) {
+      res.writeHead(statuses[Number(step[1])], { Location: String(Number(step[1]) + 1) });
+    } else if (req.url === "/redirect") {
+      res.writeHead(302, location === undefined ? {} : { Location: location });
+    } else { res.end(body); return; }
+    res.end("redirect body must not be used as the archive");
+  });
+  await new Promise(resolve => server.listen(0, "127.0.0.1", resolve));
+  t.after(async () => { server.closeAllConnections(); await new Promise(resolve => server.close(resolve)); });
+  const origin = `http://127.0.0.1:${server.address().port}`;
+  const archive = { ...digest, url: origin + "/redirect" };
+  for (const [name, target] of [
+    ["http", `http://0.0.0.0:${server.address().port}/forbidden`],
+    ["credentials", origin.replace("//", "//user:password@") + "/forbidden"],
+    ["fragment", origin + "/forbidden#fragment"],
+    ["protocol", "file:///forbidden"],
+  ]) {
+    location = target; requests.length = 0;
+    await assert.rejects(acquireArchive(archive, pin, path.join(directory, name)), /Use an HTTPS archive URL/);
+    assert.deepEqual(requests, ["/redirect"], "Reject the destination before making its request");
+  }
+  requests.length = 0;
+  const cache = path.join(directory, "valid");
+  const acquired = await acquireArchive({ ...digest, url: origin + "/chain/0" }, pin, cache);
+  await verifyBundle(acquired, pin);
+  assert.deepEqual(requests, Array.from({ length: 6 }, (_, i) => "/chain/" + i));
+  // Failed repair through redirects must preserve the previous cache contents.
+  const chunk = path.join(acquired, "chunks/000001.json");
+  await fs.writeFile(chunk, "damaged cache retained for inspection");
+  for (const [target, expected, count] of [
+    ["/redirect", /Too many catalogue archive redirects/, 6],
+    [undefined, /Catalogue archive redirect has no Location/, 1],
+    ["http://[invalid", /Invalid URL/, 1],
+  ]) {
+    location = target; requests.length = 0;
+    await assert.rejects(acquireArchive(archive, pin, cache), expected);
+    assert.equal(requests.length, count);
+    assert.equal(await fs.readFile(chunk, "utf8"), "damaged cache retained for inspection");
+  }
+  assert(!(await fs.readdir(directory)).some(name => name.startsWith(".catalog-acquire-")));
+});
+
 test("private assembly preserves prior output on compile/final-copy failure and rejects concurrent replacement", async t => {
   const directory = await temporary(t), config = path.join(directory, "config.json"), output = path.join(directory, "site");
   await fs.writeFile(config, JSON.stringify({ bundle: path.join(fixtures, "ties"), pin, mode: "indexed" }));

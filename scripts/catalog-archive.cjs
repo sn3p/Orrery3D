@@ -14,12 +14,31 @@ function validateArchive(archive) {
     || typeof archive.sha256 !== "string" || !/^[a-f0-9]{64}$/.test(archive.sha256)) {
     throw new Error("An archive requires a trusted SHA-256 and byte length (at most 1 GB).");
   }
-  const url = new URL(archive.url);
+  return validateArchiveURL(archive.url);
+}
+
+function validateArchiveURL(value) {
+  const url = new URL(value);
   if (url.username || url.password || url.hash || (url.protocol !== "https:"
     && !(url.protocol === "http:" && ["127.0.0.1", "[::1]", "localhost"].includes(url.hostname)))) {
     throw new Error("Use an HTTPS archive URL (HTTP is allowed only for localhost tests).");
   }
   return url;
+}
+
+async function fetchArchive(url) {
+  const signal = AbortSignal.timeout(300_000);
+  for (let redirects = 0; ; redirects++) {
+    // Automatic redirects would request an unchecked destination before we
+    // could enforce the same transport policy as the configured archive URL.
+    const response = await fetch(url, { redirect: "manual", signal });
+    if (![301, 302, 303, 307, 308].includes(response.status)) return response;
+    const location = response.headers.get("location");
+    await response.body?.cancel();
+    if (!location) throw new Error("Catalogue archive redirect has no Location.");
+    if (redirects >= 5) throw new Error("Too many catalogue archive redirects.");
+    url = validateArchiveURL(new URL(location, url));
+  }
 }
 
 async function unpack(archive, directory, pin) {
@@ -56,8 +75,11 @@ async function acquireArchive(archive, pin, cache = path.join(root, ".context/ca
   const temporary = await fs.mkdtemp(path.join(path.dirname(cache), ".catalog-acquire-"));
   try {
     const filename = path.join(temporary, "bundle.tar.gz");
-    const response = await fetch(url, { signal: AbortSignal.timeout(300_000) });
-    if (!response.ok || !response.body) throw new Error("Catalogue archive request failed: " + response.status);
+    const response = await fetchArchive(url);
+    if (!response.ok || !response.body) {
+      await response.body?.cancel();
+      throw new Error("Catalogue archive request failed: " + response.status);
+    }
     // Fetch transparently decodes HTTP Content-Encoding. The pin identifies
     // the archive body, independently of transfer encoding and Content-Length.
     let received = 0;
