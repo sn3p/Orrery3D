@@ -1,9 +1,6 @@
 import Orrery3D from "./js/Orrery3D";
-import catalog from "../data/catalog.json";
 import "./main.css";
 import "./fonts/OFL.txt";
-
-const MPC_DATA_URL = catalog;
 
 export let orrery;
 export const ready = (async () => {
@@ -12,12 +9,15 @@ export const ready = (async () => {
     orrery = new Orrery3D({ container: document.getElementById("orrery"),
       ...(trial ? { startJed: trial.startJed, jedDelta: trial.speed } : {}) });
     if (trial) {
-      await orrery.loadCatalog({ ...trial.pin, url: new URL(trial.pin.url, document.baseURI).href }, { mode: trial.mode });
+      const pin = trial.latest ? null : { ...trial.pin, url: new URL(trial.pin.url, document.baseURI).href };
+      await orrery.loadCatalog(pin, { mode: trial.mode, latest: trial.latest });
       return orrery;
     }
-    const response = await fetch(MPC_DATA_URL);
-    if (!response.ok) throw new Error(`Catalogue request failed: ${response.status}`);
-    orrery.setupAsteroids(await response.json());
+    if (__HISTORICAL_CATALOG__) {
+      const response = await fetch(require("../data/catalog.json"));
+      if (!response.ok) throw new Error(`Catalogue request failed: ${response.status}`);
+      orrery.setupAsteroids(await response.json());
+    }
     return orrery;
   } catch (error) {
     console.error(error);

@@ -16,7 +16,7 @@
     "deploy": "gh workflow run pages.yml --ref master",
     "watch": "webpack --config webpack.app.config.cjs --mode development --watch",
     "serve": "webpack serve --config webpack.app.config.cjs --mode development --open",
-    "test": "node --test --test-concurrency=1 tests/catalog-source.cjs tests/catalog-delivery.cjs && node tests/run.cjs"
+    "test": "node --test --test-concurrency=1 tests/catalog-source.cjs tests/catalog-delivery.cjs tests/catalog-latest.cjs && node tests/run.cjs"
   },
   "dependencies": {
     "dat.gui": "^0.7.9",

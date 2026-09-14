@@ -6,7 +6,7 @@ population discovered by the current simulation date.
 
 The current branch uses the verified bundle already provisioned in
 `.context/catalog-downloads/`. **Fresh-checkout/CI provisioning is still incomplete.**
-This relative local source must be replaced by a source available to a fresh build.
+This relative local source must be replaced by the published shared `latest` URL.
 The build fails if its selected source is missing; it never silently restores the
 historical catalogue.
 
@@ -33,12 +33,12 @@ reuses identical content, but retains previous changed contents in history.
 Source corrections and byte-based chunk boundaries can change many files; update
 only differing files without promising that every refresh changes just one chunk.
 
-This smaller browser distribution is **not implemented yet**. The current complete-
-bundle verifier also requires the full exports, gzip sidecars and master. A separate
-verified browser-distribution path must be implemented and tested; do not simply
-remove those files or skip verification. Preserve integrity checks and let each
-consumer session open one coherent current dataset. Latest-data selection does not require the
-browser to mix old and new chunks while an update is being published.
+The producer is implementing this smaller browser distribution. This app now
+supports its separately versioned browser contract and `latest.json` discovery.
+The complete-bundle verifier remains separate and still requires the original
+full exports, gzip sidecars and master. Each browser session opens one verified
+index and validates its chunks. Missing or corrupt chunks stop loading and show
+a reload message; reloading opens the current dataset without an app rebuild.
 
 Producer changes belong in a fresh `orrery-data` review unit. This preference does
 not change another application's implementation or authorize publication, a merge,
@@ -53,8 +53,35 @@ options below describe available tooling, not required product behavior.
 | `whole` | Loads the same selected larger catalogue as a single complete JSON file; useful for comparison. |
 | `historical` | Loads the old checked-in 100,000-object file; explicit rollback/comparison only. |
 
-`indexed` and `whole` require a complete bundle source and an index pin. Neither
-imposes a record limit. `historical` accepts `mode` and optional `retained` only.
+`indexed` accepts a shared `latest` URL or a complete bundle and index pin.
+`whole` requires a complete bundle; the shared browser distribution has no
+whole-file payload. Neither mode imposes a record limit. `historical` accepts
+`mode` and optional `retained` only, for explicit comparisons/rollback.
+Indexed builds do not emit the historical catalogue.
+
+## Shared runtime source
+
+The producer's planned endpoint is shown below. It must be published and verified
+before this replaces the current tracked local selection:
+
+```json
+{
+  "mode": "indexed",
+  "latest": "https://sn3p.github.io/orrery-data/latest.json"
+}
+```
+
+This configuration builds only the app. Build, serve and watch neither download
+the dataset nor require a local bundle/cache. The browser requests `latest.json`
+when opened, then the verified index and needed chunks directly from the shared
+host. The build artifact has no historical catalogue or copy of the shared data.
+
+Discovery requires HTTPS; localhost HTTP is allowed for development/tests.
+Credentials, fragments and discovery redirects are rejected. Each new session
+revalidates the descriptor, bounded to 4 KiB, and validates index/chunk lengths,
+hashes, fields and date coverage. Missing/corrupt data uses the existing reload
+error message. Optional `startJed` and `speed` retain their existing meaning.
+`latest` cannot be combined with a bundle, archive, pin or retained set.
 
 ## One selection for normal commands
 
@@ -93,16 +120,17 @@ The separate `catalog:build`/benchmark commands retain their original trial
 settings: JD 2444270.5 (February 1, 1980 **UTC**) and speed 1.5. `whole` remains an
 explicit comparison mode. A failed indexed read never selects whole mode.
 
-Development and watch keep one verified selection for the process lifetime;
-restart after changing configuration or choosing a different pin. Source edits
-recompile normally. App assets can live in webpack's memory filesystem; verified
-data is staged in `dist/data/` and served from the static root. Configured
+Development and watch keep one configuration for the process lifetime;
+restart after changing its URL or local pin. Shared dataset updates need only a
+browser reload. Source edits recompile normally. App assets can live in webpack's
+memory filesystem; complete local bundles are staged in `dist/data/`. Shared
+runtime selection stages no data. Configured
 serve/watch reject output/static-root overrides, so the cleaner cannot reach an
 input bundle and the data cannot become disconnected from its serving path.
 
 ## Immutable acquisition
 
-A configuration accepts exactly one `bundle` directory or `archive` object.
+A complete-bundle configuration accepts one `bundle` directory or `archive` object.
 An archive requires a real explicit HTTPS `url`, positive `bytes` and lowercase
 SHA-256 `sha256`. HTTP is permitted only on localhost for transport tests. At most
 five redirects are followed, with every destination checked against the same URL
@@ -153,8 +181,9 @@ release mechanism; Pages publishes the completed artifact separately.
 Optional `retained` entries each specify their own `pin` plus `archive` or local
 `bundle`. Every build reacquires or verifies them and stages their original
 `data/delivery-v1-HASH/` paths. They are explicit inputs, never discovered by
-copying arbitrary old cache directories. The historical `data/catalog.json`
-continues to be emitted because existing clients and regression controls use it.
+copying arbitrary old cache directories. The historical `data/catalog.json` is
+emitted only for explicit historical builds and existing regression controls.
+Configured indexed builds exclude it.
 
 For rollback between indexed pins, change the selected pin and keep both the
 previous and newer pins in the deployment's retained set as needed. To restore
@@ -183,13 +212,13 @@ browser distribution still needs an explicitly tested implementation.
 
 ## Remaining delivery work
 
-1. Implement the smaller verified browser distribution, content-aware manual
+1. Finish and publish the producer's verified browser distribution, content-aware manual
    update path and shared static hosting in `orrery-data`. Consumer apps should
    fetch the shared dataset directly; no release archive or per-app data copy
    is required by the user's preference.
-2. Give consumers a tested current-index discovery contract and real hosted
-   endpoint. Replace the temporary local source through the appropriate consumer
-   review unit. Verify clean builds without the local data cache, failed-update
+2. Reconcile this app's fixtures with the reviewed producer contract and replace
+   the temporary local source with its real hosted endpoint. Verify clean builds
+   without the local data cache, failed-update
    preservation and consistent index/chunk selection during refresh. Do not
    invent a remote URL or silently change the existing pin contract.
 3. Verify the resulting Pages artifact and an authorized hosted candidate at the
@@ -201,7 +230,8 @@ browser distribution still needs an explicitly tested implementation.
    performance and maximum-speed buffering/late-start costs remain unverified
    rollout details; the user has confirmed the current local app works.
 
-`npm test` covers archive transport, corruption/cache repair, failed builds,
+`npm test` covers shared discovery/update/reload/cancellation, builds without
+local data, archive transport, corruption/cache repair, failed builds,
 retention through HTTP requests, historical rollback, actual normal build/dev/watch
 commands, and the configured browser entry under a nested path. The existing
 three-browser loader/graphics/lifecycle suite remains in place. These checks use

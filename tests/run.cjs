@@ -67,6 +67,7 @@ async function main() {
   await require("./catalog-loading.cjs").build(buildOutput);
   diagnostics.stage("build selected standard catalogue entry");
   require("./catalog-delivery-browser.cjs").build(buildOutput);
+  await require("./catalog-latest-browser.cjs").build(buildOutput);
   const server = http.createServer((req, res) => {
     const pathname = new URL(req.url, "http://localhost").pathname;
     if (pathname.endsWith("/favicon.ico")) { res.writeHead(204); res.end(); return; }
@@ -93,6 +94,7 @@ async function main() {
         const browser = diagnostics.browser(instance, name);
         diagnostics.stage(name + ": selected standard catalogue entry");
         await require("./catalog-delivery-browser.cjs").run(browser, url, output, name);
+        await require("./catalog-latest-browser.cjs").run(browser, url, output, name);
         diagnostics.stage(name + ": catalog adapter lifecycle");
         const catalogLoading = await require("./catalog-loading.cjs").run(browser, url, output, name);
         diagnostics.stage(`${name}: WebGL 2 capability`);
@@ -400,4 +402,4 @@ main().then(() => diagnostics.pass()).catch(async error => {
   console.error(error);
   process.exitCode = 1;
   if (diagnostics.run.status !== "failed") await diagnostics.fail(error);
-});
+}).finally(() => require("./catalog-latest-browser.cjs").close());

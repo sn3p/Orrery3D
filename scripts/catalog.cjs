@@ -103,6 +103,15 @@ async function prepareCatalog(configPath, { publicDefaults = false } = {}) {
   for (const key of ["startJed", "speed"]) {
     if (config[key] !== undefined && !Number.isFinite(config[key])) throw new Error("Invalid catalogue " + key + ".");
   }
+  if (Object.hasOwn(config, "latest")) {
+    if (config.mode !== "indexed" || Object.keys(config).some(key => !["mode", "latest", "startJed", "speed"].includes(key))) {
+      throw new Error("Latest catalogue selection accepts indexed mode, latest URL and optional date/speed only.");
+    }
+    const { validateLatestURL } = await import("../src/js/catalog/contract.js");
+    const runtime = { mode: "indexed", latest: validateLatestURL(config.latest).href };
+    for (const key of ["startJed", "speed"]) if (config[key] !== undefined) runtime[key] = config[key];
+    return { staged: [], runtime };
+  }
   if (config.retained !== undefined && !Array.isArray(config.retained)) throw new Error("retained must be an array of pinned bundles.");
   const inputs = [...(config.mode === "historical" ? [] : [config]), ...(config.retained || [])];
   const staged = [];
@@ -127,7 +136,8 @@ function catalogPlugins(base, runtime) {
   const webpack = require("webpack");
   return base.plugins.map(plugin => plugin instanceof webpack.DefinePlugin
     && Object.hasOwn(plugin.definitions, "__CATALOG_TRIAL__")
-    ? new webpack.DefinePlugin({ ...plugin.definitions, __CATALOG_TRIAL__: JSON.stringify(runtime) }) : plugin);
+    ? new webpack.DefinePlugin({ ...plugin.definitions, __CATALOG_TRIAL__: JSON.stringify(runtime),
+      __HISTORICAL_CATALOG__: JSON.stringify(runtime === null) }) : plugin);
 }
 
 async function stageCatalog(prepared, output) {
@@ -193,8 +203,8 @@ async function buildTrial(configPath, output = path.join(root, ".context/catalog
       }
       throw error;
     }
-    return { output, bundle: prepared.runtime ? path.join(output, "data", path.basename(prepared.staged[0].directory)) : null,
-      runtime: prepared.runtime, siteBytes, retained: prepared.staged.slice(prepared.runtime ? 1 : 0).map(item => item.pin.sha256) };
+    return { output, bundle: prepared.runtime?.pin ? path.join(output, "data", path.basename(prepared.staged[0].directory)) : null,
+      runtime: prepared.runtime, siteBytes, retained: prepared.staged.slice(prepared.runtime?.pin ? 1 : 0).map(item => item.pin.sha256) };
   } finally { if (!preserveRecovery) await fs.rm(lock, { force: true, recursive: true }); }
 }
 

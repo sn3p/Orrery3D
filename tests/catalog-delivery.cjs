@@ -220,20 +220,39 @@ test("explicit retention survives update and rollback with each original pin", a
   assert.equal((await collect(opened[0].read({ start: 2, end: 6 }))).length, 4);
 });
 
-test("standard build selects configuration, preserves historical asset, and fails closed for missing configuration", async t => {
+test("standard indexed build selects configuration, omits historical asset, and fails closed for missing configuration", async t => {
   const directory = await temporary(t), config = path.join(directory, "config.json");
   await fs.writeFile(config, JSON.stringify({ bundle: path.join(fixtures, "ties"), pin, mode: "indexed" }));
   const result = await command(npmArgs(["run", "build", "--", "--output-clean"]), { CATALOG_CONFIG: config });
   assert.equal(result.code, 0, result.output);
   assert.doesNotMatch(result.output, /MODULE_TYPELESS_PACKAGE_JSON/, "Build must load catalogue modules with an explicit module type");
   await verifyBundle(path.join(root, "dist/data/delivery-v1-" + pin.sha256), pin);
-  assert.deepEqual(await hashFile(path.join(root, "dist/data/catalog.json")), await hashFile(path.join(root, "data/catalog.json")));
+  await assert.rejects(fs.stat(path.join(root, "dist/data/catalog.json")), { code: "ENOENT" });
   const previous = await hashFile(path.join(root, "dist/bundle.js"));
   for (const script of ["build", "serve", "watch"]) {
     const failed = await command(npmArgs(["run", script]), { CATALOG_CONFIG: path.join(directory, "missing.json") });
     assert.notEqual(failed.code, 0, script + " must reject an explicitly missing configuration");
   }
   assert.deepEqual(await hashFile(path.join(root, "dist/bundle.js")), previous);
+});
+
+test("shared runtime build needs no local bundle or data host and emits no historical dataset", async t => {
+  const directory = await temporary(t), config = path.join(directory, "config.json");
+  const latest = "http://127.0.0.1:9/shared/latest.json";
+  await fs.writeFile(config, JSON.stringify({ mode: "indexed", latest }));
+  const result = await command(npmArgs(["run", "build", "--", "--output-clean"]), { CATALOG_CONFIG: config });
+  assert.equal(result.code, 0, result.output);
+  assert((await fs.readFile(path.join(root, "dist/bundle.js"), "utf8")).includes(latest));
+  await assert.rejects(fs.stat(path.join(root, "dist/data")), { code: "ENOENT" });
+  const { prepareCatalog } = require("../scripts/catalog.cjs");
+  assert.deepEqual(await prepareCatalog(config), { staged: [], runtime: { mode: "indexed", latest } });
+  for (const invalid of [
+    { mode: "whole", latest }, { mode: "indexed", latest, pin }, { mode: "indexed", latest, retained: [] },
+    { mode: "indexed", latest, bundle: "missing" }, { mode: "indexed", latest: "http://example.com/latest.json" },
+  ]) {
+    await fs.writeFile(config, JSON.stringify(invalid));
+    await assert.rejects(prepareCatalog(config));
+  }
 });
 
 async function eventually(check, message) {
@@ -247,37 +266,39 @@ async function eventually(check, message) {
 
 test("standard serve and watch keep the selected pin through source recompilation", async t => {
   const directory = await temporary(t), config = path.join(directory, "config.json"), entry = path.join(directory, "entry.js");
-  await fs.writeFile(config, JSON.stringify({ bundle: path.join(fixtures, "ties"), pin, mode: "indexed" }));
-  for (const script of ["serve", "watch"]) {
-    await fs.writeFile(entry, 'globalThis.deliveryMarker = "delivery-before";');
-    const probe = http.createServer();
-    await new Promise(resolve => probe.listen(0, "127.0.0.1", resolve));
-    const port = probe.address().port;
-    await new Promise(resolve => probe.close(resolve));
-    const extra = script === "serve" ? ["--host", "127.0.0.1", "--port", String(port), "--no-open"] : [];
-    const child = spawn(process.execPath, npmArgs(["run", script, "--", "--entry-reset", "--entry", "./src/index.js", "--entry", entry, ...extra]),
-      { cwd: root, detached: true, env: { ...process.env, CATALOG_CONFIG: config } });
-    let log = "";
-    child.stdout.on("data", chunk => { log += chunk; }); child.stderr.on("data", chunk => { log += chunk; });
-    const stopped = once(child, "exit");
-    const app = async () => script === "serve" ? (await fetch(`http://127.0.0.1:${port}/bundle.js`)).text()
-      : fs.readFile(path.join(root, "dist/bundle.js"), "utf8");
-    try {
-      await eventually(async () => (await app()).includes("delivery-before"), script + " did not compile: " + log);
-      if (script === "serve") {
-        const data = await fetch(`http://127.0.0.1:${port}/data/delivery-v1-${pin.sha256}/index.json`);
-        assert.equal(data.status, 200);
-        assert.equal((await data.arrayBuffer()).byteLength, pin.bytes);
+  for (const selection of [{ bundle: path.join(fixtures, "ties"), pin }, { latest: "http://127.0.0.1:9/latest.json" }]) {
+    await fs.writeFile(config, JSON.stringify({ ...selection, mode: "indexed" }));
+    for (const script of ["serve", "watch"]) {
+      await fs.writeFile(entry, 'globalThis.deliveryMarker = "delivery-before";');
+      const probe = http.createServer();
+      await new Promise(resolve => probe.listen(0, "127.0.0.1", resolve));
+      const port = probe.address().port;
+      await new Promise(resolve => probe.close(resolve));
+      const extra = script === "serve" ? ["--host", "127.0.0.1", "--port", String(port), "--no-open"] : [];
+      const child = spawn(process.execPath, npmArgs(["run", script, "--", "--entry-reset", "--entry", "./src/index.js", "--entry", entry, ...extra]),
+        { cwd: root, detached: true, env: { ...process.env, CATALOG_CONFIG: config } });
+      let log = "";
+      child.stdout.on("data", chunk => { log += chunk; }); child.stderr.on("data", chunk => { log += chunk; });
+      const stopped = once(child, "exit");
+      const app = async () => script === "serve" ? (await fetch(`http://127.0.0.1:${port}/bundle.js`)).text()
+        : fs.readFile(path.join(root, "dist/bundle.js"), "utf8");
+      try {
+        await eventually(async () => (await app()).includes("delivery-before"), script + " did not compile: " + log);
+        if (script === "serve" && !selection.latest) {
+          const data = await fetch(`http://127.0.0.1:${port}/data/delivery-v1-${pin.sha256}/index.json`);
+          assert.equal(data.status, 200);
+          assert.equal((await data.arrayBuffer()).byteLength, pin.bytes);
+        }
+        await fs.writeFile(entry, 'globalThis.deliveryMarker = "delivery-after";');
+        await eventually(async () => (await app()).includes("delivery-after"), script + " did not rebuild: " + log);
+        if (!selection.latest) await verifyBundle(path.join(root, "dist/data/delivery-v1-" + pin.sha256), pin);
+        assert((await app()).includes(selection.latest || pin.sha256), "Recompilation retains the configured runtime source");
+      } catch (error) { throw new Error(error.message + "\n" + log, { cause: error }); } finally {
+        try { process.kill(-child.pid, "SIGTERM"); } catch (error) { if (error.code !== "ESRCH") throw error; }
+        await stopped;
       }
-      await fs.writeFile(entry, 'globalThis.deliveryMarker = "delivery-after";');
-      await eventually(async () => (await app()).includes("delivery-after"), script + " did not rebuild: " + log);
-      await verifyBundle(path.join(root, "dist/data/delivery-v1-" + pin.sha256), pin);
-      assert((await app()).includes(pin.sha256), "Recompilation retains the configured runtime pin");
-    } catch (error) { throw new Error(error.message + "\n" + log, { cause: error }); } finally {
-      try { process.kill(-child.pid, "SIGTERM"); } catch (error) { if (error.code !== "ESRCH") throw error; }
-      await stopped;
+      assert.doesNotMatch(log, /MODULE_TYPELESS_PACKAGE_JSON/, script + " must load catalogue modules with an explicit module type");
     }
-    assert.doesNotMatch(log, /MODULE_TYPELESS_PACKAGE_JSON/, script + " must load catalogue modules with an explicit module type");
   }
 });
 
