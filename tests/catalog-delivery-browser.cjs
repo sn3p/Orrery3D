@@ -18,6 +18,25 @@ exports.build = output => {
 };
 
 exports.run = async (browser, base, output, name) => {
+  const missing = await browser.newPage({ viewport: { width: 390, height: 800 } });
+  const missingRequests = [];
+  missing.on("request", request => missingRequests.push(request.url()));
+  try {
+    await missing.goto(base + "/unconfigured/");
+    await missing.getByRole("alert").waitFor();
+    assert.match(await missing.getByRole("alert").textContent(), /Could not load the asteroid catalogue/);
+    assert(!missingRequests.some(url => /\.json(?:\?|$)/.test(url)), "An unconfigured app cannot fetch a fallback dataset");
+    await missing.addInitScript(() => {
+      const getContext = HTMLCanvasElement.prototype.getContext;
+      HTMLCanvasElement.prototype.getContext = function(type, ...args) {
+        return type.startsWith("webgl") ? null : getContext.call(this, type, ...args);
+      };
+    });
+    await missing.goto(base + "/delivery/Orrery3D/");
+    await missing.getByRole("alert").waitFor();
+    assert.match(await missing.getByRole("alert").textContent(), /WebGL 2 is required/);
+    assert.equal(await missing.locator(".dg.main, .orrery-options").count(), 0);
+  } finally { await missing.close(); }
   const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
   const errors = [], requests = [], checks = [];
   page.on("pageerror", error => errors.push(error.message));

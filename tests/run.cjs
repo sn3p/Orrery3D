@@ -61,8 +61,10 @@ async function main() {
   await require("./catalogue-preparation.cjs").testPurePreparation();
   diagnostics.stage("build browser fixture");
   await build("./tests/browser.js", path.join(buildOutput, "fixture"));
-  diagnostics.stage("build production app");
-  await build("./src/index.js", path.join(buildOutput, "production"));
+  diagnostics.stage("build uninstrumented renderer fixture");
+  await build("./tests/renderer-entry.js", path.join(buildOutput, "renderer"));
+  diagnostics.stage("build unconfigured production entry");
+  await build("./src/index.js", path.join(buildOutput, "unconfigured"));
   diagnostics.stage("build catalog adapter trials");
   await require("./catalog-loading.cjs").build(buildOutput);
   diagnostics.stage("build selected standard catalogue entry");
@@ -344,24 +346,24 @@ async function main() {
         result.planetFramesAfterReload = await require("./planet-bodies.cjs").testScene(page);
         result.sphereBodiesAfterReload = await require("./planet-bodies.cjs").testBodies(page);
         assert.deepEqual(errors, []);
-        diagnostics.stage(`${name}: production loading, memory and interactions`);
-        if (name === "chromium") result.catalogueMemory = await require("./catalogue-memory.cjs")(browser, url + "/production/");
-        // Actual production build, without a test API.
-        await page.goto(url + "/production/");
+        diagnostics.stage(`${name}: renderer fixture loading, memory and interactions`);
+        if (name === "chromium") result.catalogueMemory = await require("./catalogue-memory.cjs")(browser, url + "/renderer/");
+        // Uninstrumented renderer fixture; production catalogue boot is checked above.
+        await page.goto(url + "/renderer/");
         await page.waitForFunction(() => Number(document.querySelector("#orrery-count").textContent) > 0);
         await checkUiTypography(page);
         assert(await page.locator("#orrery-status").isHidden());
-        result.productionReadouts = await require("./readouts.cjs").testProductionReadouts(page);
+        result.rendererReadouts = await require("./readouts.cjs").testProductionReadouts(page);
         assert.deepEqual(errors, []);
-        await require("./rendering.cjs").testPausedLoading(page, url + "/production/");
-        result.productionInteractions = await require("./rendering.cjs").testProductionInteractions(browser, url + "/production/", output, name);
-        diagnostics.stage(`${name}: production DPR options`);
-        result.optionsPanel = await require("./options.cjs").testOptions(browser, url + "/production/", output, name);
-        result.pixelRatioOptions = await require("./pixel-ratio.cjs")(browser, url + "/production/", output, name);
+        await require("./rendering.cjs").testPausedLoading(page, url + "/renderer/");
+        result.rendererInteractions = await require("./rendering.cjs").testProductionInteractions(browser, url + "/renderer/", output, name);
+        diagnostics.stage(`${name}: renderer DPR options`);
+        result.optionsPanel = await require("./options.cjs").testOptions(browser, url + "/renderer/", output, name);
+        result.pixelRatioOptions = await require("./pixel-ratio.cjs")(browser, url + "/renderer/", output, name);
         assert.deepEqual(errors, []);
-        result.catalogueLoading = await require("./catalogue-preparation.cjs").testLoading(browser, url + "/production/");
+        result.catalogueLoading = await require("./catalogue-preparation.cjs").testLoading(browser, url + "/renderer/");
         diagnostics.stage(`${name}: expected loading and WebGL errors`);
-        // Loading and failure through the real fetch/boot boundary.
+        // Loading and failure through shared renderer startup and fixture fetch.
         await page.route("**/data/catalog.json", async route => {
           await new Promise(resolve => setTimeout(resolve, 200));
           await route.fulfill({ status: 503, body: "Unavailable" });
@@ -390,7 +392,7 @@ async function main() {
         result.benchmark = await require("./benchmark.cjs")(browser, output, name);
         report.push({ browser: name, version: browser.version(), diagnosticChecks, cataloguePreparation, transferredCloud, ...result, contextRecovery: lossSupported, checks: "passed" });
         fs.writeFileSync(path.join(output, "results.json"), JSON.stringify(report, null, 2));
-        console.log(`${name}: production, controls, timing, discoveries, bounds, replacement, colours, recovery, errors, shader accuracy passed`);
+        console.log(`${name}: renderer, controls, timing, discoveries, bounds, replacement, colours, recovery, errors, shader accuracy passed`);
       } catch (error) {
         await diagnostics.fail(error);
         throw error;

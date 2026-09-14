@@ -210,7 +210,7 @@ async function run(browser, base, output, name) {
       const emptyComplete = app.catalogLoader.sceneComplete();
       const response = await fetch(base + "/catalog-fixtures/ties/full/catalog.json");
       const rows = await response.json();
-      // Reload a real pending trial, then replace it at the historical entry.
+      // Reload a real pending trial, then replace it through the renderer setup API.
       await app.loadCatalog({ ...tiesPin, url: base + "/catalog-fixtures/ties/index.json" });
       app.autoRender = false; app.cancelRender();
       app.setupAsteroids(rows);

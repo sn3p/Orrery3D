@@ -135,8 +135,7 @@ function catalogPlugins(base, runtime) {
   const webpack = require("webpack");
   return base.plugins.map(plugin => plugin instanceof webpack.DefinePlugin
     && Object.hasOwn(plugin.definitions, "__CATALOG_TRIAL__")
-    ? new webpack.DefinePlugin({ ...plugin.definitions, __CATALOG_TRIAL__: JSON.stringify(runtime),
-      __HISTORICAL_CATALOG__: JSON.stringify(runtime === null) }) : plugin);
+    ? new webpack.DefinePlugin({ ...plugin.definitions, __CATALOG_TRIAL__: JSON.stringify(runtime) }) : plugin);
 }
 
 async function stageCatalog(prepared, output) {

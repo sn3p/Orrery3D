@@ -48,7 +48,7 @@ module.exports = {
     ],
   },
   plugins: [
-    new webpack.DefinePlugin({ __CATALOG_TRIAL__: "null", __HISTORICAL_CATALOG__: "true" }),
+    new webpack.DefinePlugin({ __CATALOG_TRIAL__: "null" }),
     new MiniCssExtractPlugin({ filename: "[name].css" }),
     new HtmlWebpackPlugin({
       inject: false,

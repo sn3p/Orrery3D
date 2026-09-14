@@ -1,7 +1,7 @@
 const assert = require("node:assert/strict");
 
-// Exercise the actual production fetch/boot path, without test fixtures keeping
-// the same records alive. CDP GC makes reachability deterministic in Chrome.
+// Exercise shared renderer startup with an uninstrumented fixture entry, so no
+// test oracle keeps its records alive. CDP GC makes reachability deterministic.
 module.exports = async (browser, url) => {
   const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
   const errors = [];
@@ -37,10 +37,10 @@ module.exports = async (browser, url) => {
         retained: window.catalogueProbe.references.map(reference => !!reference.deref()),
       }));
       Object.assign(report, await session.send("Runtime.getHeapUsage"), { navigation });
-      console.log("Production catalogue memory:", JSON.stringify(report));
-      assert.equal(report.count, 100000, "The real bundled catalogue was parsed");
+      console.log("Renderer fixture memory:", JSON.stringify(report));
+      assert.equal(report.count, 100000, "The renderer fixture was parsed");
       assert.deepEqual(report.retained, [false, false, false, false],
-        "Parsed catalogue array and sampled raw records must be collectible after production boot");
+        "Parsed catalogue array and sampled raw records must be collectible after renderer startup");
       const before = await page.locator("canvas").screenshot();
       const date = await page.locator("#orrery-date").textContent();
       const count = await page.locator("#orrery-count").textContent();
