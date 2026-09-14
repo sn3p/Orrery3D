@@ -8,7 +8,7 @@ import Planet from "../src/js/Planet";
 import Sun from "../src/js/Sun";
 import * as THREE from "three";
 import { validateShader } from "./shader";
-import catalogUrl from "../data/catalog.json";
+import catalogUrl from "./fixtures/renderer/catalog.json";
 
 window.testReady = ready.then(async () => {
   // Reference records belong to the tests. Fetch a separate copy after the

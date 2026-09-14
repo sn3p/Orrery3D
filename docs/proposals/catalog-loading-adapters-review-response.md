@@ -1,5 +1,8 @@
 # Response: catalog loading proposal review
 
+> Trial-era record: the later rollout removes the historical app mode and fallback.
+> Current selection and delivery are documented in [catalogue delivery](../catalog-delivery.md).
+
 **13 September 2026.** Addressed the supplied [review](catalog-loading-adapters-review.md) in [proposal revision 2](catalog-loading-adapters.md). The original review is unchanged. This response records design dispositions, not implemented runtime fixes or permission to deploy.
 
 The simplification direction is sound. The revised proposal uses one source class, one committed prefix, fixed lookahead, fixed buffers and measured main-thread preparation. Several suggested deletions would remove required shared-contract behavior or overstate earlier evidence; those are qualified below.

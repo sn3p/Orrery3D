@@ -55,7 +55,8 @@ options below describe available tooling, not required product behavior.
 `indexed` accepts a shared `latest` URL or a complete bundle and index pin.
 `whole` requires a complete bundle; the shared browser distribution has no
 whole-file payload. Neither mode imposes a record limit. Other mode values are rejected.
-Indexed builds do not emit the historical catalogue.
+The historical mode and app fallback have been removed. The former dataset is
+kept only as a [renderer test fixture](../tests/fixtures/renderer/README.md).
 
 ## Shared runtime source
 

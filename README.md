@@ -60,7 +60,7 @@ npx playwright install firefox webkit
 BROWSERS=chromium,firefox,webkit npm test
 ```
 
-Tests build the real app and exercise loading, playback, discoveries, colours, camera controls, resizing, graphics recovery and errors. They also compare GPU positions against the orbital model across the historical 100,000-object control catalogue at 12 dates, check extreme elliptical orbits with an independent solver, and compare rendered pixels in overview and close views. WebKit testing is not a substitute for testing Safari and iOS on their actual devices.
+Tests build the real app and exercise loading, playback, discoveries, colours, camera controls, resizing, graphics recovery and errors. They also compare GPU positions against the orbital model across the 100,000-object [renderer fixture](tests/fixtures/renderer/README.md) at 12 dates, check extreme elliptical orbits with an independent solver, and compare rendered pixels in overview and close views. WebKit testing is not a substitute for testing Safari and iOS on their actual devices.
 
 Each invocation replaces `.context/tests/report/` with fresh results and screenshots.
 `run.json` records the current stage, outcome and failure stack, including build or
@@ -123,7 +123,7 @@ GitHub's built-in token; no personal access token or deploy key is needed.
 
 ## Get updated data
 
-Normal build, serve and watch commands select the **895,910-object indexed catalogue** in `catalog.config.json`. There is no 100,000-object cap. The displayed count follows the simulation date and reaches the full discovery-dated population as time advances. Indexed app builds exclude the old [`data/catalog.json`](data/catalog.json); that file remains for renderer regression controls.
+Normal build, serve and watch commands select the **895,910-object indexed catalogue** in `catalog.config.json`. There is no 100,000-object cap. The displayed count follows the simulation date and reaches the full discovery-dated population as time advances. App builds contain no legacy dataset or fallback. The former catalogue is isolated under [`tests/fixtures/renderer/`](tests/fixtures/renderer/README.md) for numerical and renderer regression coverage.
 
 An [import in Orrery](https://github.com/sn3p/Orrery/pull/49) on **12 September 2026** produced **895,910 objects with matching discovery dates** from **1,563,495 orbital records**. The other **667,585** were unnumbered objects without matching discovery records in `NumberedMPs.txt`. These are dated counts that change with MPC updates; see [Orrery issue #47](https://github.com/sn3p/Orrery/issues/47) for the source verification and discovery-date limitation.
 
