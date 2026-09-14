@@ -99,7 +99,7 @@ async function stageVerifiedBundle(source, pin, destinationRoot, verified) {
 
 async function prepareCatalog(configPath, { publicDefaults = false } = {}) {
   const config = JSON.parse(await fs.readFile(configPath, "utf8"));
-  if (!["indexed", "whole", "historical"].includes(config.mode)) throw new Error("Choose indexed, whole or historical mode.");
+  if (!["indexed", "whole"].includes(config.mode)) throw new Error("Choose indexed or whole mode.");
   for (const key of ["startJed", "speed"]) {
     if (config[key] !== undefined && !Number.isFinite(config[key])) throw new Error("Invalid catalogue " + key + ".");
   }
@@ -113,7 +113,7 @@ async function prepareCatalog(configPath, { publicDefaults = false } = {}) {
     return { staged: [], runtime };
   }
   if (config.retained !== undefined && !Array.isArray(config.retained)) throw new Error("retained must be an array of pinned bundles.");
-  const inputs = [...(config.mode === "historical" ? [] : [config]), ...(config.retained || [])];
+  const inputs = [config, ...(config.retained || [])];
   const staged = [];
   for (const input of inputs) {
     if (!input || (typeof input.bundle === "string") === !!input.archive) {
@@ -125,7 +125,6 @@ async function prepareCatalog(configPath, { publicDefaults = false } = {}) {
     const item = await stageVerifiedBundle(source, input.pin, cache, await verifyBundle(source, input.pin));
     if (!staged.some(other => other.pin.sha256 === input.pin.sha256)) staged.push({ ...item, pin: input.pin });
   }
-  if (config.mode === "historical") return { staged, runtime: null };
   const runtime = { pin: { ...config.pin, url: "data/" + path.basename(staged[0].directory) + "/index.json" }, mode: config.mode };
   if (config.startJed !== undefined || !publicDefaults) runtime.startJed = config.startJed ?? 2444270.5;
   if (config.speed !== undefined || !publicDefaults) runtime.speed = config.speed ?? 1.5;

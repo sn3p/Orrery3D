@@ -7,7 +7,6 @@ const { prepareCatalog, catalogPlugins, stageCatalog, checkOutput } = require(".
 
 module.exports = async (env, argv = {}) => {
   const filename = selectedCatalog();
-  if (!filename) return base;
   if (Object.keys(argv).some(key => key.startsWith("static"))) {
     throw new Error("Configured catalogue development must serve static files from dist/.");
   }

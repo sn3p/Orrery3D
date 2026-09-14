@@ -51,12 +51,10 @@ options below describe available tooling, not required product behavior.
 | --- | --- |
 | `indexed` | Default. Loads the selected larger catalogue in verified chunks as the simulation needs them. |
 | `whole` | Loads the same selected larger catalogue as a single complete JSON file; useful for comparison. |
-| `historical` | Loads the old checked-in 100,000-object file; explicit rollback/comparison only. |
 
 `indexed` accepts a shared `latest` URL or a complete bundle and index pin.
 `whole` requires a complete bundle; the shared browser distribution has no
-whole-file payload. Neither mode imposes a record limit. `historical` accepts
-`mode` and optional `retained` only, for explicit comparisons/rollback.
+whole-file payload. Neither mode imposes a record limit. Other mode values are rejected.
 Indexed builds do not emit the historical catalogue.
 
 ## Shared runtime source
@@ -171,8 +169,7 @@ Both caches are generated conveniences; neither is a release-retention policy.
 
 ## Assembly, retention and rollback
 
-All standard production builds, including a bare `historical` selection, compile
-into a private sibling directory, then
+All standard production builds compile into a private sibling directory, then
 stage and verify all selected/retained bundles **after** webpack cleaning.
 Only a complete successful assembly replaces `dist/`. Compilation and final-copy
 failure leave the previous output intact. Competing builds for the same output
@@ -185,29 +182,17 @@ release mechanism; Pages publishes the completed artifact separately.
 Optional `retained` entries each specify their own `pin` plus `archive` or local
 `bundle`. Every build reacquires or verifies them and stages their original
 `data/delivery-v1-HASH/` paths. They are explicit inputs, never discovered by
-copying arbitrary old cache directories. The historical `data/catalog.json` is
-emitted only for explicit historical builds and existing regression controls.
-Configured indexed builds exclude it.
+copying arbitrary old cache directories.
 
 For rollback between indexed pins, change the selected pin and keep both the
-previous and newer pins in the deployment's retained set as needed. To restore
-the historical app while preserving indexed clients, select:
-
-```json
-{
-  "mode": "historical",
-  "retained": []
-}
-```
-
-**Fill `retained` with the real pinned bundle descriptors before rolling back an
-indexed deployment.** An empty array retains no indexed versions. A bare historical selection drops all indexed bundles and is unsuitable for
-rollback while indexed clients may still be open. Git history preserves selection records; durable published archives
-must preserve the referenced bytes. Expiring Actions artifacts are insufficient.
+previous and newer pins in the deployment's retained set as needed. An empty
+`retained` array keeps no additional indexed versions. Git history preserves
+selection records; their referenced bundles must also remain available.
+Expiring Actions artifacts alone are insufficient for rollback.
 
 Prepared sites are limited to 900 MB of regular-file content, leaving headroom
 under Pages' current 1 GB site limit. The known bundle is 398,669,815 bytes; two
-such bundles plus the app/historical asset fit, while three do not. This is a
+such bundles plus the app fit, while three do not. This is a
 bounded retention design: clients referencing omitted older versions may fail and
 need reload. Multiple-version retention is optional under the current latest-data direction.
 Do not describe two bundles as unlimited stale-client compatibility. The smaller
@@ -236,7 +221,7 @@ browser distribution still needs an explicitly tested implementation.
 
 `npm test` covers shared discovery/update/reload/cancellation, builds without
 local data, archive transport, corruption/cache repair, failed builds,
-retention through HTTP requests, historical rollback, actual normal build/dev/watch
+retention and rollback through HTTP requests, actual normal build/dev/watch
 commands, and the configured browser entry under a nested path. The existing
 three-browser loader/graphics/lifecycle suite remains in place. These checks use
 fixtures; full-data and hosted evidence must be reported separately.

@@ -210,13 +210,13 @@ test("explicit retention survives update and rollback with each original pin", a
       assert.equal((await collect(source.read({ start: 0, end: 0 }))).length, 0);
     }
   }
-  await fs.writeFile(config, JSON.stringify({ mode: "historical", retained: profiles }));
+  await fs.writeFile(config, JSON.stringify({ ...profiles[0], mode: "indexed", retained: [profiles[1]] }));
   // The public command must keep old indexed clients alive during rollback.
   const rollback = await command(npmArgs(["run", "build", "--", "--output-clean"]), { CATALOG_CONFIG: config });
   assert.equal(rollback.code, 0, rollback.output);
   for (const profile of profiles) await verifyBundle(path.join(root, "dist/data/delivery-v1-" + profile.pin.sha256), profile.pin);
   const built = await buildTrial(config, output, { entry, publicDefaults: true });
-  assert.equal(built.runtime, null);
+  assert.equal(built.runtime.pin.sha256, profiles[0].pin.sha256);
   assert.equal((await collect(opened[0].read({ start: 2, end: 6 }))).length, 4);
 });
 
@@ -255,7 +255,7 @@ test("shared runtime build needs no local bundle or data host and emits no histo
   }
 });
 
-test("bare historical production rollback preserves every prior asset on a late compilation failure", async t => {
+test("production source changes preserve every prior asset on a late compilation failure", async t => {
   const directory = await temporary(t), config = path.join(directory, "config.json");
   const output = path.join(root, "dist");
   await fs.writeFile(config, JSON.stringify({ mode: "indexed", latest: "http://127.0.0.1:9/latest.json" }));
@@ -268,7 +268,7 @@ test("bare historical production rollback preserves every prior asset on a late 
     return Promise.all(names.map(async name => ({ name, ...await hashFile(path.join(output, name)) })));
   };
   const before = await inventory();
-  await fs.writeFile(config, JSON.stringify({ mode: "historical" }));
+  await fs.writeFile(config, JSON.stringify({ mode: "whole", bundle: path.join(fixtures, "ties"), pin }));
   const preload = path.join(directory, "late-failure.cjs");
   await fs.writeFile(preload, `require(${JSON.stringify(path.join(root, "webpack.config.js"))}).plugins.push({
     apply(compiler) { compiler.hooks.afterEmit.tap("SimulatedLateFailure", () => { throw new Error("Simulated late compilation failure"); }); }
@@ -280,9 +280,28 @@ test("bare historical production rollback preserves every prior asset on a late 
   assert.deepEqual(await inventory(), before, "Even emitted assets must stay private until the build succeeds");
   const restored = await command(npmArgs(["run", "build", "--", "--output-clean"]), { CATALOG_CONFIG: config });
   assert.equal(restored.code, 0, restored.output);
-  assert.deepEqual(await hashFile(path.join(output, "data/catalog.json")), await hashFile(path.join(root, "data/catalog.json")));
+  await verifyBundle(path.join(output, "data/delivery-v1-" + pin.sha256), pin);
+  assert((await fs.readFile(path.join(output, "bundle.js"), "utf8")).includes('mode:"whole"'));
   await assert.rejects(fs.stat(path.join(output, "previous-site.txt")), { code: "ENOENT" });
   await assert.rejects(fs.stat(output + ".build-lock"), { code: "ENOENT" });
+});
+
+test("removed historical mode rejects every public command without changing previous output", async t => {
+  const directory = await temporary(t), config = path.join(directory, "config.json");
+  await fs.writeFile(config, JSON.stringify({ mode: "indexed", latest: "http://127.0.0.1:9/latest.json" }));
+  const built = await command(npmArgs(["run", "build"]), { CATALOG_CONFIG: config });
+  assert.equal(built.code, 0, built.output);
+  const output = path.join(root, "dist/bundle.js"), before = await hashFile(output);
+  for (const settings of [{ mode: "historical" }, { mode: "historical", retained: [] }]) {
+    await fs.writeFile(config, JSON.stringify(settings));
+    for (const script of ["build", "serve", "watch", "catalog:build"]) {
+      const result = await command(npmArgs(["run", script, ...(script === "catalog:build" ? ["--", config] : [])]),
+        { CATALOG_CONFIG: config });
+      assert.notEqual(result.code, 0, script + " must reject historical mode");
+      assert.match(result.output, /Choose indexed or whole mode/);
+      assert.deepEqual(await hashFile(output), before);
+    }
+  }
 });
 
 async function eventually(check, message) {

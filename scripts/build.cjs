@@ -1,7 +1,7 @@
 const selectedCatalog = require("./catalog-selection.cjs");
 
 (async () => {
-  const config = selectedCatalog({ production: true });
+  const config = selectedCatalog();
   if (process.argv.slice(2).some(arg => arg !== "--output-clean")) {
     throw new Error("Configured catalogue builds accept only --output-clean; their verified output is dist/.");
   }
