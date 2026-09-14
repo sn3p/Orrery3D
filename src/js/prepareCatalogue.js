@@ -4,6 +4,16 @@ export const REFERENCE_JED = 2458600.5;
 const TAU = 2 * Math.PI;
 export const wrapPhase = value => value - TAU * Math.floor((value + Math.PI) / TAU);
 
+export function allocateCatalogue(count, epoch) {
+  if (!Number.isSafeInteger(count) || count < 0 || !Number.isFinite(epoch)) throw new Error("Invalid catalogue capacity.");
+  return {
+    p: new Float32Array(count * 3), q: new Float32Array(count * 3),
+    elements: new Float32Array(count * 2), meanAnomalies: new Float32Array(count),
+    discovery: new Float32Array(count), phases: new Float64Array(count * 2),
+    dates: new Float64Array(count), radius: 0, epoch,
+  };
+}
+
 // Pure CPU preparation: no Three.js, DOM, fetch or GPU resource allocation.
 // The result owns its typed buffers, retains no input records, and can be
 // transferred between threads. Hand ownership to one Asteroids instance;
@@ -26,10 +36,7 @@ export function prepareCatalogue(data, epoch) {
   const sorted = Array.from({ length: data.length }, (_, index) => index)
     .sort((a, b) => data[a].disc - data[b].disc);
   const count = sorted.length;
-  const p = new Float32Array(count * 3), q = new Float32Array(count * 3);
-  const elements = new Float32Array(count * 2), meanAnomalies = new Float32Array(count);
-  const discovery = new Float32Array(count);
-  const phases = new Float64Array(count * 2), dates = new Float64Array(count);
+  const { p, q, elements, meanAnomalies, discovery, phases, dates } = allocateCatalogue(count, epoch);
   let radius = 0;
   sorted.forEach((sourceIndex, index) => {
     const d = data[sourceIndex];

@@ -1,0 +1,139 @@
+{
+  "contract_version": 1,
+  "bundles": {
+    "ties": {
+      "path": "ties",
+      "catalog_id": "export-v1-f6a52de14467c659c52d3c56b2567e2883aa8e0f3a99e51ccc8de5cd90e2b32f",
+      "pin": {
+        "url": "index.json",
+        "sha256": "f6d1d7e141cae032e700d9cda3aeffd78793b8353f00a377f4ea79c27bd33947",
+        "bytes": 3333
+      }
+    },
+    "empty": {
+      "path": "empty",
+      "catalog_id": "export-v1-561e8d547e5ee4be27c024d6790a451f6059d2ac786a53f8f29ec782796b1c71",
+      "pin": {
+        "url": "index.json",
+        "sha256": "5a4a2805f97fd782a3d515acbe2457a261f713c248ba25bcc8a88f7be03b3c0e",
+        "bytes": 2355
+      }
+    }
+  },
+  "queries": [
+    {
+      "bundle": "ties",
+      "through": 0,
+      "requiredEnd": 0
+    },
+    {
+      "bundle": "ties",
+      "through": 2451544.499999,
+      "requiredEnd": 1
+    },
+    {
+      "bundle": "ties",
+      "through": 2451544.5,
+      "requiredEnd": 4
+    },
+    {
+      "bundle": "ties",
+      "through": 2451544.75,
+      "requiredEnd": 4
+    },
+    {
+      "bundle": "ties",
+      "through": 9999999,
+      "requiredEnd": 6
+    },
+    {
+      "bundle": "empty",
+      "through": 2451544.5,
+      "requiredEnd": 0
+    }
+  ],
+  "reads": [
+    {
+      "bundle": "ties",
+      "start": 0,
+      "end": 0,
+      "expectedOrdinals": []
+    },
+    {
+      "bundle": "ties",
+      "start": 1,
+      "end": 4,
+      "expectedOrdinals": [
+        1,
+        2,
+        3
+      ]
+    },
+    {
+      "bundle": "ties",
+      "start": 0,
+      "end": 6,
+      "expectedOrdinals": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5
+      ]
+    },
+    {
+      "bundle": "ties",
+      "start": 4,
+      "end": 6,
+      "expectedOrdinals": [
+        4,
+        5
+      ]
+    },
+    {
+      "bundle": "empty",
+      "start": 0,
+      "end": 0,
+      "expectedOrdinals": []
+    }
+  ],
+  "invalid_requests": [
+    {
+      "read": {
+        "start": -1,
+        "end": 2
+      }
+    },
+    {
+      "read": {
+        "start": 3,
+        "end": 2
+      }
+    },
+    {
+      "read": {
+        "start": 0,
+        "end": 7
+      }
+    },
+    {
+      "read": {
+        "start": true,
+        "end": 2
+      }
+    },
+    {
+      "read": {
+        "start": 0.5,
+        "end": 2
+      }
+    },
+    {
+      "through": "2000-01-01"
+    },
+    {
+      "through": null
+    }
+  ]
+}

@@ -63,6 +63,8 @@ async function main() {
   await build("./tests/browser.js", path.join(buildOutput, "fixture"));
   diagnostics.stage("build production app");
   await build("./src/index.js", path.join(buildOutput, "production"));
+  diagnostics.stage("build catalog adapter trials");
+  await require("./catalog-loading.cjs").build(buildOutput);
   const server = http.createServer((req, res) => {
     const pathname = new URL(req.url, "http://localhost").pathname;
     if (pathname.endsWith("/favicon.ico")) { res.writeHead(204); res.end(); return; }
@@ -87,6 +89,8 @@ async function main() {
         diagnostics.stage(`${name}: diagnostic failure regressions`);
         const diagnosticChecks = await require("./diagnostics-regression.cjs")(instance, output, name);
         const browser = diagnostics.browser(instance, name);
+        diagnostics.stage(name + ": catalog adapter lifecycle");
+        const catalogLoading = await require("./catalog-loading.cjs").run(browser, url, output, name);
         diagnostics.stage(`${name}: WebGL 2 capability`);
         const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
         const graphics = await page.evaluate(() => {
@@ -238,6 +242,7 @@ async function main() {
           app.gui.gui.updateDisplay();
           return { timing, catalog: catalog.length, fresh, faded, instant, hidden };
         });
+        result.catalogLoading = catalogLoading;
         result.sharedFrames = sharedFrames;
         result.fps = fps;
         result.pausedRendering = pausedRendering;

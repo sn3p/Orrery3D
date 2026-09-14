@@ -9,11 +9,14 @@
   "scripts": {
     "benchmark": "node benchmarks/run.cjs",
     "benchmark:serve": "node benchmarks/server.cjs",
+    "catalog:build": "node scripts/catalog.cjs build",
+    "catalog:serve": "node scripts/serve-catalog.cjs",
+    "catalog:benchmark": "node benchmarks/catalog-loading.cjs",
     "build": "webpack --config webpack.config.js --mode production",
     "deploy": "gh workflow run pages.yml --ref master",
     "watch": "webpack --config webpack.config.js --mode development --watch",
     "serve": "webpack serve --mode development --open",
-    "test": "node tests/run.cjs"
+    "test": "node --test tests/catalog-source.cjs && node tests/run.cjs"
   },
   "dependencies": {
     "dat.gui": "^0.7.9",

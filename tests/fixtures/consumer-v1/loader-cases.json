@@ -1,0 +1,57 @@
+{
+  "contract_version": 1,
+  "cases": [
+    {
+      "id": "tie-gap-and-graphics-commit",
+      "bundle": "ties",
+      "through": 2451544.5,
+      "requiredEnd": 4,
+      "steps": [
+        {"action": "receive-verified", "range": [2, 4], "coverageComplete": false, "sceneComplete": false},
+        {"action": "receive-verified", "range": [0, 2], "coverageComplete": true, "sceneComplete": false},
+        {"action": "commit-graphics", "range": [0, 4], "coverageComplete": true, "sceneComplete": true},
+        {"action": "receive-duplicate", "range": [0, 2], "visibleRows": 4}
+      ]
+    },
+    {
+      "id": "overlapping-read-cancellation",
+      "bundle": "ties",
+      "steps": [
+        {"action": "read", "request": "A", "range": [0, 4]},
+        {"action": "read", "request": "B", "range": [2, 6]},
+        {"action": "abort", "request": "A", "expectedError": "AbortError"},
+        {"action": "finish", "request": "B", "expectedOrdinals": [2, 3, 4, 5], "completionRange": [2, 6]}
+      ]
+    },
+    {
+      "id": "catalog-switch-rejects-stale-worker-results",
+      "steps": [
+        {"action": "activate", "bundle": "ties", "generation": 1},
+        {"action": "activate", "bundle": "empty", "generation": 2},
+        {"action": "late-worker-batch", "bundle": "ties", "generation": 1, "range": [0, 2], "accepted": false},
+        {"action": "commit-empty", "bundle": "empty", "generation": 2, "visibleRows": 0, "sceneComplete": true}
+      ]
+    },
+    {
+      "id": "buffering-does-not-catch-up",
+      "speedDaysPerSecond": 90,
+      "steps": [
+        {"action": "buffer-at-covered-date", "elapsedWallSeconds": 5, "expectedSimulatedAdvance": 0},
+        {"action": "coverage-ready-and-clock-reset", "expectedSimulatedAdvance": 0},
+        {"action": "play-for-elapsed-seconds", "elapsedWallSeconds": 0.1, "expectedSimulatedAdvance": 9}
+      ]
+    },
+    {
+      "id": "recovery-and-reverse",
+      "bundle": "ties",
+      "steps": [
+        {"action": "complete-scene", "through": 9999999, "visibleRows": 6},
+        {"action": "reverse", "through": 2451544.5, "visibleRows": 4},
+        {"action": "lose-graphics-context", "sceneComplete": false},
+        {"action": "rebuild-verified-population", "through": 2451544.5, "visibleRows": 4, "sceneComplete": true},
+        {"action": "close-twice", "expectedError": null},
+        {"action": "read-after-close", "range": [0, 2], "mustReject": true}
+      ]
+    }
+  ]
+}

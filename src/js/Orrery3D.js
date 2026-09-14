@@ -7,8 +7,10 @@ import Sun from "./Sun";
 import Planet from "./Planet";
 import Orbit from "./Orbit";
 import Asteroids from "./Asteroids";
-import { prepareCatalogue } from "./prepareCatalogue";
+import { prepareCatalogue, allocateCatalogue } from "./prepareCatalogue";
 import PlaybackClock from "./PlaybackClock";
+import CatalogSource from "./catalog/CatalogSource";
+import CatalogLoader from "./catalog/CatalogLoader";
 
 export default class Orrery3D {
   constructor(options = {}) {
@@ -20,7 +22,8 @@ export default class Orrery3D {
     this.asteroidDiscoveryColor = new THREE.Color(options.asteroidDiscoveryColor ?? 0x00ff00);
     this.asteroidDiscoveryDuration = options.asteroidDiscoveryDuration ?? 200; // in Julian days
 
-    this._jed = toJED(this.startDate);
+    this._jed = options.startJed ?? toJED(this.startDate);
+    if (!Number.isFinite(this._jed)) throw new Error("Invalid starting Julian day.");
     this.planets = [];
     this.asteroidsDiscovered = 0;
     this.clock = new PlaybackClock();
@@ -48,6 +51,14 @@ export default class Orrery3D {
   get jed() { return this._jed; }
 
   set jed(value) {
+    if (this.catalogLoader?.source) {
+      if (!Number.isFinite(value)) throw new Error("Invalid Julian day.");
+      this.requestedJed = value;
+      this.resetClock();
+      this.catalogLoader.demand(value, { playing: this.isPlaying, hidden: document.hidden });
+      this.onCatalogChange();
+      return;
+    }
     if (Object.is(value, this._jed)) return;
     this._jed = value;
     this.requestRender();
@@ -59,6 +70,7 @@ export default class Orrery3D {
     if (Object.is(value, this._jedDelta)) return;
     const wasPlaying = this.isPlaying;
     this._jedDelta = value;
+    this.catalogLoader?.demand(this.requestedJed ?? this.jed, { playing: this.isPlaying, hidden: document.hidden });
     if (!wasPlaying || !this.isPlaying) this.resetClock();
     this.requestRender();
   }
@@ -97,7 +109,10 @@ export default class Orrery3D {
     this.renderer.debug.onShaderError = (gl, program, vertex, fragment) => {
       console.error("Unable to compile the scene shaders:", gl.getProgramInfoLog(program),
         gl.getShaderInfoLog(vertex), gl.getShaderInfoLog(fragment));
-      this.setStatus("Unable to render this scene on your graphics device.", true);
+      this.renderFailure = new Error("Unable to render this scene on your graphics device.");
+      this.catalogLoader?.loseGraphics();
+      this.cancelRender();
+      this.setStatus(this.renderFailure.message, true);
     };
 
     // Create camera
@@ -136,10 +151,23 @@ export default class Orrery3D {
   setupAsteroids(data) {
     if (this.disposed) return;
     const packed = prepareCatalogue(data, this.jed);
+    this.catalogOpening?.abort();
+    this.catalogOpening = null;
+    this.catalogLoader?.clear();
+    this.catalogWaiting = false;
+    this.catalogFailure = null;
+    this.requestedJed = null;
+    this.installAsteroids(packed);
+    this.setStatus("");
+    this.clock.reset();
+    this.requestRender();
+  }
+
+  installAsteroids(packed, committedCount = packed.dates.length) {
     const asteroids = new Asteroids(packed, {
       jed: this.jed, color: this.asteroidColor,
       discoveryColor: this.asteroidDiscoveryColor,
-      discoveryDuration: this.asteroidDiscoveryDuration,
+      discoveryDuration: this.asteroidDiscoveryDuration, committedCount,
     });
     if (this.asteroids) {
       this.scene.remove(this.asteroids);
@@ -149,9 +177,78 @@ export default class Orrery3D {
     this.asteroidsGeometry = asteroids.geometry;
     this.scene.add(asteroids);
     this.updateAsteroids();
-    this.setStatus("");
-    this.clock.reset();
-    this.requestRender();
+  }
+
+  ensureCatalogLoader() {
+    if (this.catalogLoader) return this.catalogLoader;
+    this.catalogLoader = new CatalogLoader({
+      activate: count => {
+        const start = performance.now();
+        this.installAsteroids(allocateCatalogue(count, this.jed), 0);
+        performance.measure("catalog:allocate", { start });
+      },
+      commit: event => {
+        const start = performance.now();
+        this.asteroids.append(prepareCatalogue(event.records, this.asteroids.epoch), event.start);
+        performance.measure("catalog:prepare-commit", { start });
+      },
+      changed: this.onCatalogChange,
+    });
+    return this.catalogLoader;
+  }
+
+  // Trial boot and internal source replacement use the same lifecycle. No
+  // public catalog selector or date-navigation control is introduced.
+  async loadCatalog(pin, { mode = "indexed" } = {}) {
+    if (this.disposed) return;
+    this.catalogOpening?.abort();
+    const opening = this.catalogOpening = new AbortController();
+    this.catalogWaiting = true;
+    this.catalogFailure = null;
+    const loader = this.ensureCatalogLoader();
+    loader.clear();
+    this.requestedJed = null;
+    if (this.asteroids) {
+      this.asteroids.geometry.setDrawRange(0, 0);
+      this.asteroidsDiscovered = 0;
+    }
+    this.setStatus("Loading asteroids…");
+    this.resetClock();
+    try {
+      const source = await CatalogSource.open(pin, { mode, signal: opening.signal });
+      if (this.disposed || opening !== this.catalogOpening) { source.close(); return; }
+      loader.activate(source, this.jed);
+      loader.demand(this.jed, { playing: this.isPlaying, hidden: document.hidden });
+      this.catalogOpening = null;
+      this.requestRender();
+      return source;
+    } catch (error) {
+      if (this.disposed || opening !== this.catalogOpening || error.name === "AbortError") return;
+      this.catalogOpening = null;
+      this.catalogFailure = error;
+      loader.clear();
+      this.setStatus("Could not load the asteroid catalogue. Reload to try again.", true);
+      throw error;
+    }
+  }
+
+  onCatalogChange = (request = true) => {
+    if (this.disposed || !this.catalogLoader?.source) return;
+    if (this.renderFailure) { this.setStatus(this.renderFailure.message, true); return; }
+    const loader = this.catalogLoader;
+    if (this.catalogWaiting) this.resetClock();
+    this.catalogWaiting = loader.buffering || !loader.initialRendered;
+    this.setStatus(loader.error ? "Could not load more asteroids. Reload to try again."
+      : !loader.initialRendered ? "Loading asteroids…" : loader.buffering ? "Buffering asteroids…" : "", !!loader.error);
+    if (request) this.requestRender();
+  };
+
+  catalogCanDraw(jed) {
+    const loader = this.catalogLoader;
+    if (!loader?.source) return !this.catalogOpening && !this.catalogFailure;
+    const ready = loader.demand(jed, { playing: this.isPlaying, hidden: document.hidden });
+    if (!ready) this.onCatalogChange(false);
+    return ready;
   }
 
   updateAsteroids() {
@@ -176,12 +273,13 @@ export default class Orrery3D {
 
   onVisibilityChange = () => {
     this.resetClock();
+    this.catalogLoader?.demand(this.requestedJed ?? this.jed, { playing: this.isPlaying, hidden: document.hidden });
     if (document.hidden) this.cancelRender();
     else this.requestRender();
   };
 
   requestRender = () => {
-    if (!this.autoRender || this.disposed || document.hidden || this.contextLost || this.animationFrame !== null) return;
+    if (!this.autoRender || this.disposed || document.hidden || this.contextLost || this.renderFailure || this.animationFrame !== null) return;
     this.animationFrame = requestAnimationFrame(this.render);
   };
 
@@ -194,6 +292,8 @@ export default class Orrery3D {
     this.contextLost = true;
     this.cancelRender();
     this.resetClock();
+    this.catalogLoader?.loseGraphics();
+    this.catalogLoader?.demand(this.requestedJed ?? this.jed, { playing: this.isPlaying, hidden: true });
     // Release Three's old GPU caches/listeners while the context is lost.
     // Geometry arrays and materials remain reusable and upload on restoration.
     this.disposeSceneResources();
@@ -202,6 +302,7 @@ export default class Orrery3D {
 
   onContextRestored = () => {
     this.contextLost = false;
+    this.renderFailure = null;
     this.resetClock();
     this.setStatus(this.statusMessage, this.statusError);
     this.requestRender();
@@ -216,24 +317,54 @@ export default class Orrery3D {
       return;
     }
 
-    this.renderFrame(this.jed + this.clock.advance(timestamp, this.jedDelta));
-    if (this.isPlaying) this.requestRender();
+    if (this.catalogOpening || this.catalogWaiting) this.clock.reset();
+    const next = this.requestedJed ?? (this.jed + this.clock.advance(timestamp, this.jedDelta));
+    if (this.catalogCanDraw(next)) {
+      this.requestedJed = null;
+      this.renderFrame(next);
+    } else {
+      this.resetClock();
+      // Initial loading draws planets only; buffering retains a complete date.
+      this.renderFrame(this.jed, { trackFps: false });
+    }
+    if (this.isPlaying && !this.catalogOpening && !this.catalogWaiting) this.requestRender();
   };
 
   // Shared scene work; callers own date advancement and scheduling. Optional
   // benchmark hooks keep asteroid CPU time and GPU draw time separate.
   renderFrame(jed = this.jed, { afterAsteroids, beforeRender, afterRender, trackFps = this.isPlaying } = {}) {
-    if (this.disposed || document.hidden || this.contextLost) return;
+    if (this.disposed || document.hidden || this.contextLost || this.renderFailure) return;
+    const loader = this.catalogLoader;
+    const commitStarted = loader?.source && (!loader.graphicsValid || loader.graphicsCount !== loader.committedCount)
+      ? performance.now() : null;
+    if (loader?.source && !loader.readyToDraw(jed)) {
+      // Explicit benchmark/date calls also pass through the completeness gate.
+      loader.demand(jed, { playing: this.isPlaying, hidden: document.hidden });
+      this.onCatalogChange(false);
+      jed = this.jed;
+    }
     // Explicit dates do not invalidate the scene or advance the playback clock.
     this._jed = jed;
-    if (this.asteroidsGeometry) {
+    if (this.asteroidsGeometry && !this.catalogOpening && !this.catalogFailure && (!loader?.source || loader.readyToDraw(jed))) {
       this.updateAsteroids();
+    } else if (this.asteroidsGeometry) {
+      this.asteroidsGeometry.setDrawRange(0, 0);
+      this.asteroidsDiscovered = 0;
     }
     afterAsteroids?.();
     this.planets.forEach((planet) => planet.render(this.jed));
 
     beforeRender?.();
     this.renderer.render(this.scene, this.camera);
+    if (commitStarted !== null) performance.measure("catalog:graphics-commit", { start: commitStarted });
+    if (loader?.source && !this.contextLost && !this.renderFailure) {
+      loader.rendered();
+      if (loader.initialRendered && this.catalogWaiting && !loader.buffering) {
+        this.catalogWaiting = false;
+        this.setStatus(loader.error ? "Could not load more asteroids. Reload to try again." : "", !!loader.error);
+        performance.mark("catalog:first-complete", { detail: { sourceId: loader.source.sourceId } });
+      }
+    }
     afterRender?.();
 
     if (trackFps) this.gui.stats.update();
@@ -268,6 +399,8 @@ export default class Orrery3D {
   dispose() {
     if (this.disposed) return;
     this.disposed = true;
+    this.catalogOpening?.abort();
+    this.catalogLoader?.dispose();
     this.cancelRender();
     document.removeEventListener("visibilitychange", this.onVisibilityChange);
     window.removeEventListener("resize", this.resize);

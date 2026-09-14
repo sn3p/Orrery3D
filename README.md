@@ -99,7 +99,7 @@ Overlapping runs for the same branch retain up to 100 pending runs, processed in
 the order they enter GitHub's concurrency queue. New runs beyond that limit are
 canceled by GitHub; see the [queue documentation](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax#example-queueing-multiple-pending-runs).
 
-No local build, generated-file commit, or push to `gh-pages` is needed to deploy.
+`dist/` is generated and ignored. No local build, generated-file commit, or push to `gh-pages` is needed to deploy.
 The workflow publishes the checked-in catalogue; it does not download fresh MPC
 data.
 
@@ -126,9 +126,9 @@ The bundled [`data/catalog.json`](data/catalog.json) contains **100,000 objects*
 
 An [import in Orrery](https://github.com/sn3p/Orrery/pull/49) on **12 September 2026** produced **895,910 objects with matching discovery dates** from **1,563,495 orbital records**. The other **667,585** were unnumbered objects without matching discovery records in `NumberedMPs.txt`. These are dated counts that change with MPC updates; see [Orrery issue #47](https://github.com/sn3p/Orrery/issues/47) for the source verification and discovery-date limitation.
 
-Orrery3D currently includes the generated catalogue only; the download/import scripts are not included in this repository. Shared catalogue tooling is being developed in [orrery-data](https://github.com/sn3p/orrery-data), and integration with this app is pending.
+Orrery3D currently includes the generated catalogue only; the download/import scripts are not included in this repository. Shared catalogue tooling is maintained in [orrery-data](https://github.com/sn3p/orrery-data). An optional [local consumer trial](docs/catalog-trial.md) supports its indexed chunks and whole-file delivery with the same pinned validation. The public app remains on its historical catalog.
 
-Larger catalogues increase download, parsing, preparation and memory costs even with GPU rendering. The benchmark's larger counts repeat the bundled records and positions; the full 895,910-object export has not yet been validated in Orrery3D. The current discovery animation requires a finite discovery date for every object.
+Larger catalogues increase download, parsing, preparation and memory costs even with GPU rendering. The benchmark's larger counts repeat the bundled records and positions; the optional trial exercises the real 895,910-object export, with [recorded loading and memory measurements](docs/catalog-trial-results.md). The current discovery animation requires a finite discovery date for every object.
 
 ## Rendering
 
