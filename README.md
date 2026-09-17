@@ -30,8 +30,9 @@ npm test
 
 The build emits the retained application bundle, styling and font assets plus a
 static `404.html`. The browser check loads the actual production bundle with a
-fixture catalogue, verifies paused playback, dialog focus/dismissal, both
-destinations, narrow and desktop layout, and a JavaScript-free fallback.
+fixture catalogue, verifies paused-then-resumed playback, dialog
+focus/dismissal, both destinations, narrow and desktop layout, and a
+JavaScript-free fallback.
 
 For local inspection, including Conductor's **Run App** action:
 
@@ -40,8 +41,8 @@ npm run serve -- --host 127.0.0.1 --port 3000 --no-open
 ```
 
 The local server shows the same move dialog over the original Orrery3D as the
-production entry. Closing the dialog leaves playback at speed `0`; the existing
-options panel can resume it for inspection.
+production entry. The scene remains paused while the dialog is open and resumes
+at its configured speed when the dialog is closed.
 
 ## Deployment
 

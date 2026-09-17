@@ -43,11 +43,11 @@ export default class Gui {
     document.body.appendChild(this.element);
     this.gui = new dat.GUI({ hideable: false, autoPlace: false });
     this.panel.appendChild(this.gui.domElement);
-    const speed = this.gui.add(this.orrery, "jedDelta", -8, 8).name("speed");
-    const input = speed.domElement.querySelector("input");
-    input.setAttribute("aria-label", "Playback speed");
-    input.title = "0 pauses; negative reverses. 1 = 60 days per second.";
-    this.addHint(speed, input.title, input);
+    this.speed = this.gui.add(this.orrery, "jedDelta", -8, 8).step(0.1).name("speed");
+    this.speedInput = this.speed.domElement.querySelector("input");
+    this.speedInput.setAttribute("aria-label", "Playback speed");
+    this.speedInput.title = "0 pauses; negative reverses. 1 = 60 days per second.";
+    this.addHint(this.speed, this.speedInput.title, this.speedInput);
 
     this.pixelRatio = this.gui.add(this.orrery, "pixelRatio", { "1×": "1", "2×": "2" }).name("DPR");
     this.pixelRatioSelect = this.pixelRatio.domElement.querySelector("select");
@@ -98,6 +98,11 @@ export default class Gui {
     if (!available && document.activeElement === this.pixelRatioSelect) {
       this.gui.domElement.querySelector("input").focus();
     }
+  }
+
+  setPlaybackSpeed(value) {
+    this.orrery.jedDelta = value;
+    this.speed.updateDisplay();
   }
 
   update() {

@@ -33,6 +33,7 @@ test("the application entry has a closable move dialog with only the two Orrery 
   assert.match(index, /<h1[^>]*>Orrery3D has moved<\/h1>/);
   assert.match(index, /close this dialog to explore the original Orrery3D/);
   assert.doesNotMatch(index, /orrery-move-mode|>2D view<|>3D view</i);
+  assert.doesNotMatch(index, /orrery-move-destination-primary/);
   assert.deepEqual(links(index), [
     "https://sn3p.github.io/Orrery/?renderer=three",
     "https://sn3p.github.io/Orrery/",

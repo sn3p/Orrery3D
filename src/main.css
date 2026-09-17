@@ -162,10 +162,6 @@ Move notice
   overflow-wrap: anywhere;
 }
 
-.orrery-move-destination-primary {
-  background: var(--color-panel-raised);
-}
-
 .orrery-move-destination:hover {
   border-color: var(--color-accent-muted);
   color: var(--color-accent);

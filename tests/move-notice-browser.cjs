@@ -50,7 +50,8 @@ async function inspectApplication(browser, viewport, screenshot) {
     const root = getComputedStyle(document.documentElement);
     const dialog = document.querySelector("#orrery-move");
     const close = dialog.querySelector(".orrery-move-close");
-    const destination = dialog.querySelector(".orrery-move-destination");
+    const destinations = [...dialog.querySelectorAll(".orrery-move-destination")];
+    const destination = destinations[0];
     const status = document.querySelector("#orrery-status");
     return {
       accent: root.getPropertyValue("--color-accent").trim(),
@@ -60,6 +61,7 @@ async function inspectApplication(browser, viewport, screenshot) {
       closeBorder: getComputedStyle(close).borderColor,
       destinationColor: getComputedStyle(destination).color,
       destinationBorder: getComputedStyle(destination).borderColor,
+      destinationBackgrounds: destinations.map(element => getComputedStyle(element).backgroundColor),
       statusColor: getComputedStyle(status).color,
       statusBorder: getComputedStyle(status).borderColor,
     };
@@ -72,6 +74,7 @@ async function inspectApplication(browser, viewport, screenshot) {
     closeBorder: "rgb(71, 123, 84)",
     destinationColor: "rgb(221, 221, 221)",
     destinationBorder: "rgb(71, 123, 84)",
+    destinationBackgrounds: ["rgb(17, 17, 17)", "rgb(17, 17, 17)"],
     statusColor: "rgb(136, 136, 136)",
     statusBorder: "rgb(54, 92, 65)",
   });
@@ -145,7 +148,10 @@ async function inspectApplication(browser, viewport, screenshot) {
   await close.click();
   assert(await dialog.isHidden());
   await page.waitForFunction(() => document.activeElement?.classList.contains("orrery-options-trigger"));
+  await page.waitForFunction(() => document.querySelector('[aria-label="Playback speed"]').value === "1.5");
+  await page.waitForFunction(previous => document.querySelector("#orrery-date").textContent !== previous, date);
   assert(await page.locator(".orrery-options-trigger").evaluate(element => element === document.activeElement));
+  assert.equal(await speed.inputValue(), "1.5", "Closing resumes the configured/default playback speed");
   assert(await page.locator("canvas").isVisible());
   await page.screenshot({ path: path.join(report, screenshot.replace("dialog", "dismissed")), fullPage: true });
 
@@ -167,6 +173,10 @@ async function inspectApplication(browser, viewport, screenshot) {
     label: "rgb(181, 232, 193)",
     slider: "rgb(71, 123, 84)",
   });
+  await speed.fill("2.5");
+  await speed.press("Enter");
+  await speed.blur();
+  assert.equal(await speed.inputValue(), "2.5", "Fractional speed remains truthful after resume and blur");
   const panelLayout = await panel.evaluate(element => {
     const rect = element.getBoundingClientRect();
     return { left: rect.left, right: rect.right, viewportWidth: innerWidth, overflow: document.documentElement.scrollWidth - innerWidth };
@@ -191,11 +201,13 @@ async function inspectFallback(browser, viewport, screenshot) {
     accent: getComputedStyle(document.documentElement).getPropertyValue("--color-accent").trim(),
     border: getComputedStyle(element).borderColor,
     linkBorder: getComputedStyle(element.querySelector("a")).borderColor,
+    linkBackgrounds: [...element.querySelectorAll("a")].map(link => getComputedStyle(link).backgroundColor),
   }));
   assert.deepEqual(theme, {
     accent: "#00e85a",
     border: "rgb(54, 92, 65)",
     linkBorder: "rgb(71, 123, 84)",
+    linkBackgrounds: ["rgb(17, 17, 17)", "rgb(17, 17, 17)"],
   });
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth), viewport.width);
   if (screenshot) await page.screenshot({ path: path.join(report, screenshot), fullPage: true });
@@ -211,6 +223,39 @@ async function inspectFallback(browser, viewport, screenshot) {
   await context.close();
 }
 
+async function inspectEarlyDismiss(browser) {
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  let releaseLatest;
+  const latestGate = new Promise(resolve => { releaseLatest = resolve; });
+  await context.route("https://sn3p.github.io/orrery-data/**", async route => {
+    if (new URL(route.request().url()).pathname.endsWith("/latest.json")) {
+      await latestGate;
+    }
+    await routeCatalog(route);
+  });
+  const page = await context.newPage();
+  const errors = [];
+  page.on("console", message => { if (message.type() === "error") errors.push(`console: ${message.text()}`); });
+  page.on("pageerror", error => errors.push(`page: ${error.message}`));
+  page.on("requestfailed", request => errors.push(`request: ${request.url()}`));
+
+  await page.goto(pathToFileURL(path.join(output, "index.html")).href);
+  const dialog = page.getByRole("dialog", { name: "Orrery3D has moved" });
+  await dialog.waitFor({ state: "visible" });
+  const date = await page.locator("#orrery-date").innerText();
+  assert(await page.locator("#orrery-status").isVisible(), "Catalogue remains pending before early dismissal");
+  assert.equal(await page.locator('[aria-label="Playback speed"]').inputValue(), "0");
+  await page.keyboard.press("Escape");
+  assert(await dialog.isHidden());
+  await page.waitForFunction(() => document.querySelector('[aria-label="Playback speed"]').value === "1.5");
+  releaseLatest();
+  await page.waitForFunction(() => document.querySelector("#orrery-status").hidden);
+  await page.waitForFunction(previous => document.querySelector("#orrery-date").textContent !== previous, date);
+  assert(await page.locator(".orrery-options-trigger").evaluate(element => element === document.activeElement));
+  assert.deepEqual(errors, []);
+  await context.close();
+}
+
 (async () => {
   await fs.rm(report, { recursive: true, force: true });
   await fs.mkdir(report, { recursive: true });
@@ -219,6 +264,7 @@ async function inspectFallback(browser, viewport, screenshot) {
     await inspectApplication(browser, { width: 1280, height: 800 }, "dialog-1280x800.png");
     await inspectApplication(browser, { width: 320, height: 720 }, "dialog-320x720.png");
     await inspectApplication(browser, { width: 160, height: 720 }, "dialog-160x720.png");
+    await inspectEarlyDismiss(browser);
     await inspectFallback(browser, { width: 320, height: 720 }, "fallback-320x720.png");
     await inspectFallback(browser, { width: 160, height: 720 });
   } finally {
