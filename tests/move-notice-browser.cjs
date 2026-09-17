@@ -109,14 +109,14 @@ async function inspectApplication(browser, viewport, screenshot) {
   await context.close();
 }
 
-async function inspectFallback(browser) {
-  const context = await browser.newContext({ javaScriptEnabled: false, viewport: { width: 320, height: 720 } });
+async function inspectFallback(browser, viewport, screenshot) {
+  const context = await browser.newContext({ javaScriptEnabled: false, viewport });
   const page = await context.newPage();
   await page.goto(`${pathToFileURL(path.join(output, "404.html")).href}?from=bookmark#missing`);
   assert.equal(await page.getByRole("heading").innerText(), "Orrery3D has moved");
   assert.deepEqual(await page.getByRole("link").evaluateAll(links => links.map(link => link.href)), destinations);
-  assert.equal(await page.evaluate(() => document.documentElement.scrollWidth), 320);
-  await page.screenshot({ path: path.join(report, "fallback-320x720.png"), fullPage: true });
+  assert.equal(await page.evaluate(() => document.documentElement.scrollWidth), viewport.width);
+  if (screenshot) await page.screenshot({ path: path.join(report, screenshot), fullPage: true });
   await context.close();
 }
 
@@ -127,7 +127,9 @@ async function inspectFallback(browser) {
   try {
     await inspectApplication(browser, { width: 1280, height: 800 }, "dialog-1280x800.png");
     await inspectApplication(browser, { width: 320, height: 720 }, "dialog-320x720.png");
-    await inspectFallback(browser);
+    await inspectApplication(browser, { width: 160, height: 720 }, "dialog-160x720.png");
+    await inspectFallback(browser, { width: 320, height: 720 }, "fallback-320x720.png");
+    await inspectFallback(browser, { width: 160, height: 720 });
   } finally {
     await browser.close();
   }

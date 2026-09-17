@@ -93,6 +93,7 @@ Move notice
   font-weight: 500;
   letter-spacing: -0.04em;
   line-height: 1.15;
+  overflow-wrap: anywhere;
 }
 
 .orrery-move p {
@@ -145,6 +146,7 @@ Move notice
   color: #d0d0d0;
   background: #101010;
   text-decoration: none;
+  overflow-wrap: anywhere;
 }
 
 .orrery-move-destination-primary {
