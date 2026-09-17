@@ -37,18 +37,18 @@ jobs:
       - name: Install browser
         run: npx playwright install --with-deps chrome
 
-      - name: Build retirement site
+      - name: Build paused retirement experience
         run: npm run build -- --output-clean
 
-      - name: Verify retirement site
+      - name: Verify move dialog and fallback
         run: npm test
 
       - name: Retain rendered checks
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: retirement-site-checks
-          path: .context/retirement-tests/
+          name: move-notice-checks
+          path: .context/move-notice-tests/
           include-hidden-files: true
           retention-days: 14
           if-no-files-found: warn

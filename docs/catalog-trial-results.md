@@ -2,8 +2,9 @@
 
 > **Historical trial-era documentation.** The later standalone rollout replaced
 > the 100,000-object default described below with the larger indexed catalogue.
-> The current production build publishes only the move notice; the maintained
-> catalogue consumer now lives in [Orrery](https://github.com/sn3p/Orrery).
+> The current production entry retains the final renderer paused behind a move
+> dialog; the maintained catalogue consumer now lives in
+> [Orrery](https://github.com/sn3p/Orrery).
 
 The local indexed consumer trial supports **895,910 dated objects** and meets
 the provisional desktop budgets at the agreed February 1980 start. The whole-file

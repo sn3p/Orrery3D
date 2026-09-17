@@ -12,8 +12,10 @@ maintained.
 
 This repository remains available as a historical record. Its source, tests,
 fixtures, documentation, licenses, and Git history are intentionally retained.
-The production build publishes only the move notice and its matching `404.html`
-fallback; it does not ship or execute the former renderer or catalogue loader.
+The production entry opens the final Three.js scene paused behind a move dialog.
+Visitors can continue to either Orrery view or close the dialog to inspect the
+paused scene. Obsolete paths use a lightweight `404.html` with the same two
+destinations.
 
 ## Retirement site maintenance
 
@@ -26,12 +28,10 @@ npm run build -- --output-clean
 npm test
 ```
 
-The build creates exactly `dist/index.html` and `dist/404.html`. Both are the
-same self-contained, JavaScript-free notice, so the root URL, query strings,
-fragments, and obsolete paths all provide working absolute links to Orrery.
-The browser check renders the page with JavaScript disabled at narrow and
-desktop sizes and verifies content, destinations, overflow, focus visibility,
-and console/network failures.
+The build emits the retained application bundle, styling and font assets plus a
+static `404.html`. The browser check loads the actual production bundle with a
+fixture catalogue, verifies paused playback, dialog focus/dismissal, both
+destinations, narrow and desktop layout, and a JavaScript-free fallback.
 
 For local inspection, including Conductor's **Run App** action:
 
@@ -39,10 +39,9 @@ For local inspection, including Conductor's **Run App** action:
 npm run serve -- --host 127.0.0.1 --port 3000 --no-open
 ```
 
-The local server builds and serves the same retirement notice. Unknown paths
-return the matching notice with a real `404` response. The former application
-development server remains available only as `npm run historical:serve` for
-source archaeology; it is not part of the maintained site.
+The local server shows the same paused scene and move dialog as the production
+entry. Closing the dialog leaves playback at speed `0`; the existing options
+panel can resume it for inspection.
 
 ## Deployment
 
@@ -68,8 +67,7 @@ environment.
 ## Historical standalone application documentation
 
 The sections below describe the final standalone Three.js application preserved
-in this repository. They are historical and do not describe what the current
-production build deploys. The complete pre-retirement README is preserved in
+beneath the current move dialog. The complete pre-retirement README is preserved in
 [the historical standalone documentation](docs/historical-standalone-readme.md).
 
 The application was a 3D port of [Orrery](https://github.com/sn3p/Orrery),

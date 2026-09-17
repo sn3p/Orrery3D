@@ -1,8 +1,8 @@
 # Local catalog adapter trial
 
 > **Historical documentation.** This runbook applies to the retained standalone
-> application source, not the current retirement-page production build. The
-> maintained catalogue consumer now lives in
+> application source retained beneath the current move dialog. The maintained
+> catalogue consumer now lives in
 > [Orrery](https://github.com/sn3p/Orrery).
 
 Normal build/serve/watch commands now select the larger indexed catalogue through
