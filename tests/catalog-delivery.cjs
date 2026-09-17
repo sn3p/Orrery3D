@@ -257,6 +257,12 @@ test("shared runtime build needs no local bundle or data host and emits no histo
   await fs.writeFile(config, JSON.stringify({ mode: "indexed", latest }));
   const result = await command(npmArgs(["run", "build", "--", "--output-clean"]), { CATALOG_CONFIG: config });
   assert.equal(result.code, 0, result.output);
+  const report = JSON.parse(result.output.slice(result.output.indexOf("{")));
+  const files = (await fs.readdir(path.join(root, "dist"), { recursive: true, withFileTypes: true })).filter(item => item.isFile());
+  const siteBytes = (await Promise.all(files.map(item => fs.stat(path.join(item.parentPath, item.name)))))
+    .reduce((total, item) => total + item.size, 0);
+  assert.equal(report.siteBytes, siteBytes, "The deployment budget includes every published file");
+  assert.equal(report.fallback, "dist/404.html");
   assert((await fs.readFile(path.join(root, "dist/bundle.js"), "utf8")).includes(latest));
   await assert.rejects(fs.stat(path.join(root, "dist/data")), { code: "ENOENT" });
   const { prepareCatalog } = require("../scripts/catalog.cjs");
@@ -306,6 +312,20 @@ test("production source changes preserve every prior asset on a late compilation
     return Promise.all(names.map(async name => ({ name, ...await hashFile(path.join(output, name)) })));
   };
   const before = await inventory();
+  const fallbackFailure = path.join(directory, "fallback-failure.cjs");
+  await fs.writeFile(fallbackFailure, `const fs = require("node:fs/promises"), copyFile = fs.copyFile;
+    fs.copyFile = async function(source, destination, ...args) {
+      if (String(source).endsWith(${JSON.stringify(path.join("retirement", "404.html"))})) {
+        throw new Error("Simulated fallback staging failure");
+      }
+      return copyFile.call(this, source, destination, ...args);
+    };`);
+  const missingFallback = await command(npmArgs(["run", "build", "--", "--output-clean"]),
+    { CATALOG_CONFIG: config, NODE_OPTIONS: `--require ${JSON.stringify(fallbackFailure)}` });
+  assert.notEqual(missingFallback.code, 0);
+  assert.match(missingFallback.output, /Simulated fallback staging failure/);
+  assert.deepEqual(await inventory(), before, "A missing fallback must not replace the complete published site");
+  await assert.rejects(fs.stat(output + ".build-lock"), { code: "ENOENT" });
   await fs.writeFile(config, JSON.stringify({ mode: "whole", bundle: path.join(fixtures, "ties"), pin }));
   const preload = path.join(directory, "late-failure.cjs");
   await fs.writeFile(preload, `require(${JSON.stringify(path.join(root, "webpack.config.js"))}).plugins.push({
