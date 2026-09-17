@@ -14,7 +14,7 @@ This repository remains available as a historical record. Its source, tests,
 fixtures, documentation, licenses, and Git history are intentionally retained.
 The production entry opens the final Three.js scene paused behind a move dialog.
 Visitors can continue to either Orrery view or close the dialog to inspect the
-paused scene. Obsolete paths use a lightweight `404.html` with the same two
+original Orrery3D. Obsolete paths use a lightweight `404.html` with the same two
 destinations.
 
 ## Retirement site maintenance
@@ -39,9 +39,9 @@ For local inspection, including Conductor's **Run App** action:
 npm run serve -- --host 127.0.0.1 --port 3000 --no-open
 ```
 
-The local server shows the same paused scene and move dialog as the production
-entry. Closing the dialog leaves playback at speed `0`; the existing options
-panel can resume it for inspection.
+The local server shows the same move dialog over the original Orrery3D as the
+production entry. Closing the dialog leaves playback at speed `0`; the existing
+options panel can resume it for inspection.
 
 ## Deployment
 

@@ -44,7 +44,7 @@ async function inspectApplication(browser, viewport, screenshot) {
   assert.equal(await page.getByText("Historical site").count(), 0);
   assert.equal(await page.getByText("View the historical source").count(), 0);
   assert.equal(await dialog.locator(".orrery-move-mode").count(), 0);
-  assert.match(await dialog.locator("p").innerText(), /close this dialog to explore the Orrery\.$/);
+  assert.match(await dialog.locator("p").innerText(), /close this dialog to explore the original Orrery3D\.$/);
 
   const theme = await page.evaluate(() => {
     const root = getComputedStyle(document.documentElement);
