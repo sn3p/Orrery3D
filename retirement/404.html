@@ -10,7 +10,15 @@
       :root {
         color-scheme: dark;
         font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
-        color: #d7d7d7;
+        --color-hud: #888;
+        --color-accent: #00e85a;
+        --color-accent-muted: #6fbf83;
+        --color-link: #ddd;
+        --color-panel: #111;
+        --color-panel-raised: #1a1a1a;
+        --color-panel-border: #365c41;
+        --color-control-border: #477b54;
+        color: #ccc;
         background: #000;
       }
 
@@ -28,13 +36,13 @@
       main {
         width: min(100%, 620px);
         padding: 34px;
-        border: 1px solid #4b4b4b;
-        background: #0a0a0a;
+        border: 1px solid var(--color-panel-border);
+        background: var(--color-panel);
       }
 
       h1 {
         margin: 0;
-        color: #fff;
+        color: #eee;
         font-size: clamp(22px, 4vw, 28px);
         font-weight: 500;
         letter-spacing: -0.04em;
@@ -44,7 +52,7 @@
 
       p {
         margin: 14px 0 0;
-        color: #aaa;
+        color: #ccc;
         font-size: 14px;
         line-height: 1.65;
       }
@@ -59,40 +67,31 @@
       a {
         min-width: 0;
         padding: 18px;
-        border: 1px solid #3d3d3d;
-        color: #d0d0d0;
-        background: #101010;
+        border: 1px solid var(--color-control-border);
+        color: var(--color-link);
+        background: var(--color-panel);
         text-decoration: none;
         overflow-wrap: anywhere;
       }
 
       a:first-child {
-        border-color: #737373;
-        background: #151515;
+        background: var(--color-panel-raised);
       }
 
       a:hover {
-        border-color: #aaa;
-        color: #fff;
-        background: #191919;
+        border-color: var(--color-accent-muted);
+        color: var(--color-accent);
+        background: var(--color-panel-raised);
       }
 
       a:focus-visible {
-        outline: 2px solid #fff;
+        outline: 1px solid var(--color-accent);
         outline-offset: 3px;
       }
 
-      span, strong { display: block; }
-
-      .mode {
-        color: #8f8f8f;
-        font-size: 10px;
-        letter-spacing: 0.13em;
-        text-transform: uppercase;
-      }
+      a > span, strong { display: block; }
 
       strong {
-        margin-top: 8px;
         color: inherit;
         font-size: 14px;
         font-weight: 500;
@@ -100,8 +99,8 @@
       }
 
       .renderer {
-        margin-top: 18px;
-        color: #888;
+        margin-top: 10px;
+        color: var(--color-hud);
         font-size: 11px;
       }
 
@@ -110,7 +109,6 @@
         main { padding: 28px 20px 20px; }
         nav { grid-template-columns: 1fr; margin-top: 22px; }
         a { padding: 14px 16px; }
-        .renderer { margin-top: 10px; }
       }
     </style>
   </head>
@@ -120,12 +118,10 @@
       <p>This page is no longer available. Choose a view in Orrery instead.</p>
       <nav aria-label="Open Orrery">
         <a href="https://sn3p.github.io/Orrery/?renderer=three">
-          <span class="mode">3D view</span>
           <strong>Open Orrery in 3D</strong>
           <span class="renderer">Three.js renderer <span aria-hidden="true">↗</span></span>
         </a>
         <a href="https://sn3p.github.io/Orrery/">
-          <span class="mode">2D view</span>
           <strong>Open Orrery in 2D</strong>
           <span class="renderer">Pixi.js renderer <span aria-hidden="true">↗</span></span>
         </a>

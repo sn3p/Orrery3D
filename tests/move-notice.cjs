@@ -31,7 +31,8 @@ test("the application entry has a closable move dialog with only the two Orrery 
   assert.match(index, /<dialog\b[^>]*id="orrery-move"/);
   assert.match(index, /aria-label="Close move notice"/);
   assert.match(index, /<h1[^>]*>Orrery3D has moved<\/h1>/);
-  assert.match(index, /close this dialog to explore the paused scene/);
+  assert.match(index, /close this dialog to explore the Orrery/);
+  assert.doesNotMatch(index, /orrery-move-mode|>2D view<|>3D view</i);
   assert.deepEqual(links(index), [
     "https://sn3p.github.io/Orrery/?renderer=three",
     "https://sn3p.github.io/Orrery/",
@@ -47,6 +48,7 @@ test("the fallback keeps the two destinations without loading the renderer", () 
     "https://sn3p.github.io/Orrery/",
   ]);
   assert.doesNotMatch(fallback, /Historical site|View the historical source/i);
+  assert.doesNotMatch(fallback, /class="mode"|>2D view<|>3D view</i);
   assert.doesNotMatch(fallback, /<script\b|<canvas\b/i);
   assert.doesNotMatch(fallback, /http-equiv=["']refresh/i);
 });

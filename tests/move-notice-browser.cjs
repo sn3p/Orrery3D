@@ -43,6 +43,38 @@ async function inspectApplication(browser, viewport, screenshot) {
   assert.deepEqual(await dialog.getByRole("link").evaluateAll(links => links.map(link => link.href)), destinations);
   assert.equal(await page.getByText("Historical site").count(), 0);
   assert.equal(await page.getByText("View the historical source").count(), 0);
+  assert.equal(await dialog.locator(".orrery-move-mode").count(), 0);
+  assert.match(await dialog.locator("p").innerText(), /close this dialog to explore the Orrery\.$/);
+
+  const theme = await page.evaluate(() => {
+    const root = getComputedStyle(document.documentElement);
+    const dialog = document.querySelector("#orrery-move");
+    const close = dialog.querySelector(".orrery-move-close");
+    const destination = dialog.querySelector(".orrery-move-destination");
+    const status = document.querySelector("#orrery-status");
+    return {
+      accent: root.getPropertyValue("--color-accent").trim(),
+      accentMuted: root.getPropertyValue("--color-accent-muted").trim(),
+      dialogBorder: getComputedStyle(dialog).borderColor,
+      closeColor: getComputedStyle(close).color,
+      closeBorder: getComputedStyle(close).borderColor,
+      destinationColor: getComputedStyle(destination).color,
+      destinationBorder: getComputedStyle(destination).borderColor,
+      statusColor: getComputedStyle(status).color,
+      statusBorder: getComputedStyle(status).borderColor,
+    };
+  });
+  assert.deepEqual(theme, {
+    accent: "#00e85a",
+    accentMuted: "#6fbf83",
+    dialogBorder: "rgb(54, 92, 65)",
+    closeColor: "rgb(181, 232, 193)",
+    closeBorder: "rgb(71, 123, 84)",
+    destinationColor: "rgb(221, 221, 221)",
+    destinationBorder: "rgb(71, 123, 84)",
+    statusColor: "rgb(136, 136, 136)",
+    statusBorder: "rgb(54, 92, 65)",
+  });
 
   const contrast = await dialog.evaluate(element => {
     const channels = value => value.match(/[\d.]+/g).slice(0, 3).map(channel => Number(channel) / 255);
@@ -57,7 +89,7 @@ async function inspectApplication(browser, viewport, screenshot) {
     const pairs = [
       [element.querySelector("p"), element],
       [element.querySelector(".orrery-move-close"), element],
-      ...[...element.querySelectorAll(".orrery-move-mode, .orrery-move-renderer")]
+      ...[...element.querySelectorAll(".orrery-move-destination strong, .orrery-move-renderer")]
         .map(text => [text, text.closest("a")]),
     ];
     return pairs.map(([text, surface]) => ratio(getComputedStyle(text).color, getComputedStyle(surface).backgroundColor || background));
@@ -66,6 +98,7 @@ async function inspectApplication(browser, viewport, screenshot) {
 
   const close = dialog.getByRole("button", { name: "Close move notice" });
   assert(await close.evaluate(element => element === document.activeElement), "Close button receives initial focus");
+  assert.equal(await close.evaluate(element => getComputedStyle(element).outlineColor), "rgb(0, 232, 90)");
 
   const speed = page.locator('[aria-label="Playback speed"]');
   assert.equal(await speed.inputValue(), "0", "Historical scene starts paused");
@@ -94,6 +127,16 @@ async function inspectApplication(browser, viewport, screenshot) {
   assert.ok(layout.overflow <= 0, `Horizontal overflow is ${layout.overflow}px`);
   await page.screenshot({ path: path.join(report, screenshot), fullPage: true });
 
+  const firstDestination = dialog.getByRole("link").first();
+  await firstDestination.hover();
+  assert.deepEqual(await firstDestination.evaluate(element => ({
+    color: getComputedStyle(element).color,
+    border: getComputedStyle(element).borderColor,
+  })), {
+    color: "rgb(0, 232, 90)",
+    border: "rgb(111, 191, 131)",
+  });
+
   await page.keyboard.press("Tab");
   assert.match(await page.locator(":focus").innerText(), /Open Orrery in 3D/);
   await page.keyboard.press("Tab");
@@ -105,6 +148,34 @@ async function inspectApplication(browser, viewport, screenshot) {
   assert(await page.locator(".orrery-options-trigger").evaluate(element => element === document.activeElement));
   assert(await page.locator("canvas").isVisible());
   await page.screenshot({ path: path.join(report, screenshot.replace("dialog", "dismissed")), fullPage: true });
+
+  const trigger = page.locator(".orrery-options-trigger");
+  assert.equal(await trigger.evaluate(element => getComputedStyle(element).color), "rgb(136, 136, 136)");
+  assert.equal(await page.locator("#orrery-date").evaluate(element => getComputedStyle(element).color), "rgb(136, 136, 136)");
+  await trigger.hover();
+  assert.equal(await trigger.evaluate(element => getComputedStyle(element).color), "rgb(0, 232, 90)");
+  await trigger.click();
+  const panel = page.locator(".orrery-options-panel");
+  assert(await panel.isVisible());
+  const panelTheme = await panel.evaluate(element => ({
+    border: getComputedStyle(element).borderColor,
+    label: getComputedStyle(element.querySelector(".property-name")).color,
+    slider: getComputedStyle(element.querySelector(".slider-fg")).backgroundColor,
+  }));
+  assert.deepEqual(panelTheme, {
+    border: "rgb(54, 92, 65)",
+    label: "rgb(181, 232, 193)",
+    slider: "rgb(71, 123, 84)",
+  });
+  const panelLayout = await panel.evaluate(element => {
+    const rect = element.getBoundingClientRect();
+    return { left: rect.left, right: rect.right, viewportWidth: innerWidth, overflow: document.documentElement.scrollWidth - innerWidth };
+  });
+  assert.ok(panelLayout.left >= 0 && panelLayout.right <= panelLayout.viewportWidth);
+  assert.ok(panelLayout.overflow <= 0, `Options horizontal overflow is ${panelLayout.overflow}px`);
+  if (viewport.width >= 1000) {
+    await page.screenshot({ path: path.join(report, "options-1280x800.png"), fullPage: true });
+  }
   assert.deepEqual(errors, []);
   await context.close();
 }
@@ -115,8 +186,28 @@ async function inspectFallback(browser, viewport, screenshot) {
   await page.goto(`${pathToFileURL(path.join(output, "404.html")).href}?from=bookmark#missing`);
   assert.equal(await page.getByRole("heading").innerText(), "Orrery3D has moved");
   assert.deepEqual(await page.getByRole("link").evaluateAll(links => links.map(link => link.href)), destinations);
+  assert.equal(await page.locator(".mode").count(), 0);
+  const theme = await page.locator("main").evaluate(element => ({
+    accent: getComputedStyle(document.documentElement).getPropertyValue("--color-accent").trim(),
+    border: getComputedStyle(element).borderColor,
+    linkBorder: getComputedStyle(element.querySelector("a")).borderColor,
+  }));
+  assert.deepEqual(theme, {
+    accent: "#00e85a",
+    border: "rgb(54, 92, 65)",
+    linkBorder: "rgb(71, 123, 84)",
+  });
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth), viewport.width);
   if (screenshot) await page.screenshot({ path: path.join(report, screenshot), fullPage: true });
+  const firstDestination = page.getByRole("link").first();
+  await firstDestination.hover();
+  assert.deepEqual(await firstDestination.evaluate(element => ({
+    color: getComputedStyle(element).color,
+    border: getComputedStyle(element).borderColor,
+  })), {
+    color: "rgb(0, 232, 90)",
+    border: "rgb(111, 191, 131)",
+  });
   await context.close();
 }
 
