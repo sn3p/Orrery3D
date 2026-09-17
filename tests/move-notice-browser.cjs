@@ -1,0 +1,276 @@
+const assert = require("node:assert/strict");
+const fs = require("node:fs/promises");
+const path = require("node:path");
+const { pathToFileURL } = require("node:url");
+const { chromium } = require("playwright");
+
+const root = path.resolve(__dirname, "..");
+const output = path.join(root, "dist");
+const report = path.join(root, ".context", "move-notice-tests");
+const fixtures = path.join(root, "tests", "fixtures", "browser-v1", "ties");
+const destinations = [
+  "https://sn3p.github.io/Orrery/?renderer=three",
+  "https://sn3p.github.io/Orrery/",
+];
+
+async function routeCatalog(route) {
+  const requestPath = new URL(route.request().url()).pathname.replace(/^\/orrery-data\//, "");
+  const filename = path.join(fixtures, requestPath);
+  try {
+    await fs.access(filename);
+    await route.fulfill({ path: filename, headers: { "Access-Control-Allow-Origin": "*" } });
+  } catch {
+    await route.abort("failed");
+  }
+}
+
+async function inspectApplication(browser, viewport, screenshot) {
+  const context = await browser.newContext({ viewport });
+  await context.route("https://sn3p.github.io/orrery-data/**", routeCatalog);
+  const page = await context.newPage();
+  const errors = [];
+  page.on("console", message => { if (message.type() === "error") errors.push(`console: ${message.text()}`); });
+  page.on("pageerror", error => errors.push(`page: ${error.message}`));
+  page.on("requestfailed", request => errors.push(`request: ${request.url()}`));
+
+  await page.goto(`${pathToFileURL(path.join(output, "index.html")).href}?from=bookmark#notice`);
+  const dialog = page.getByRole("dialog", { name: "Orrery3D has moved" });
+  await dialog.waitFor({ state: "visible" });
+  await page.waitForFunction(() => document.querySelector("#orrery-status").hidden);
+
+  assert.equal(await dialog.getByRole("heading").innerText(), "Orrery3D has moved");
+  assert.equal(await dialog.getByRole("link").count(), 2);
+  assert.deepEqual(await dialog.getByRole("link").evaluateAll(links => links.map(link => link.href)), destinations);
+  assert.equal(await page.getByText("Historical site").count(), 0);
+  assert.equal(await page.getByText("View the historical source").count(), 0);
+  assert.equal(await dialog.locator(".orrery-move-mode").count(), 0);
+  assert.match(await dialog.locator("p").innerText(), /close this dialog to explore the original Orrery3D\.$/);
+
+  const theme = await page.evaluate(() => {
+    const root = getComputedStyle(document.documentElement);
+    const dialog = document.querySelector("#orrery-move");
+    const close = dialog.querySelector(".orrery-move-close");
+    const destinations = [...dialog.querySelectorAll(".orrery-move-destination")];
+    const destination = destinations[0];
+    const status = document.querySelector("#orrery-status");
+    return {
+      accent: root.getPropertyValue("--color-accent").trim(),
+      accentMuted: root.getPropertyValue("--color-accent-muted").trim(),
+      dialogBorder: getComputedStyle(dialog).borderColor,
+      closeColor: getComputedStyle(close).color,
+      closeBorder: getComputedStyle(close).borderColor,
+      destinationColor: getComputedStyle(destination).color,
+      destinationBorder: getComputedStyle(destination).borderColor,
+      destinationBackgrounds: destinations.map(element => getComputedStyle(element).backgroundColor),
+      statusColor: getComputedStyle(status).color,
+      statusBorder: getComputedStyle(status).borderColor,
+    };
+  });
+  assert.deepEqual(theme, {
+    accent: "#00e85a",
+    accentMuted: "#6fbf83",
+    dialogBorder: "rgb(54, 92, 65)",
+    closeColor: "rgb(181, 232, 193)",
+    closeBorder: "rgb(71, 123, 84)",
+    destinationColor: "rgb(221, 221, 221)",
+    destinationBorder: "rgb(71, 123, 84)",
+    destinationBackgrounds: ["rgb(17, 17, 17)", "rgb(17, 17, 17)"],
+    statusColor: "rgb(136, 136, 136)",
+    statusBorder: "rgb(54, 92, 65)",
+  });
+
+  const contrast = await dialog.evaluate(element => {
+    const channels = value => value.match(/[\d.]+/g).slice(0, 3).map(channel => Number(channel) / 255);
+    const luminance = value => channels(value)
+      .map(channel => channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4)
+      .reduce((sum, channel, index) => sum + channel * [0.2126, 0.7152, 0.0722][index], 0);
+    const ratio = (foreground, background) => {
+      const values = [luminance(foreground), luminance(background)];
+      return (Math.max(...values) + 0.05) / (Math.min(...values) + 0.05);
+    };
+    const background = getComputedStyle(element).backgroundColor;
+    const pairs = [
+      [element.querySelector("p"), element],
+      [element.querySelector(".orrery-move-close"), element],
+      ...[...element.querySelectorAll(".orrery-move-destination strong, .orrery-move-renderer")]
+        .map(text => [text, text.closest("a")]),
+    ];
+    return pairs.map(([text, surface]) => ratio(getComputedStyle(text).color, getComputedStyle(surface).backgroundColor || background));
+  });
+  for (const ratio of contrast) assert.ok(ratio >= 4.5, `Dialog text contrast is ${ratio.toFixed(2)}:1`);
+
+  const close = dialog.getByRole("button", { name: "Close move notice" });
+  assert(await close.evaluate(element => element === document.activeElement), "Close button receives initial focus");
+  assert.equal(await close.evaluate(element => getComputedStyle(element).outlineColor), "rgb(0, 232, 90)");
+
+  const speed = page.locator('[aria-label="Playback speed"]');
+  assert.equal(await speed.inputValue(), "0", "Historical scene starts paused");
+  const date = await page.locator("#orrery-date").innerText();
+  await page.waitForTimeout(250);
+  assert.equal(await page.locator("#orrery-date").innerText(), date, "Date remains paused behind the dialog");
+  assert.equal(await page.locator("#orrery-fps").innerText(), "0 FPS");
+
+  const layout = await dialog.evaluate(element => {
+    const rect = element.getBoundingClientRect();
+    const heading = element.querySelector("h1");
+    return {
+      left: rect.left,
+      right: rect.right,
+      top: rect.top,
+      bottom: rect.bottom,
+      viewportWidth: innerWidth,
+      viewportHeight: innerHeight,
+      headingSize: parseFloat(getComputedStyle(heading).fontSize),
+      overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+    };
+  });
+  assert.ok(layout.left >= 0 && layout.right <= layout.viewportWidth);
+  assert.ok(layout.top >= 0 && layout.bottom <= layout.viewportHeight);
+  assert.ok(layout.headingSize <= 28, `Compact heading is ${layout.headingSize}px`);
+  assert.ok(layout.overflow <= 0, `Horizontal overflow is ${layout.overflow}px`);
+  await page.screenshot({ path: path.join(report, screenshot), fullPage: true });
+
+  const firstDestination = dialog.getByRole("link").first();
+  await firstDestination.hover();
+  assert.deepEqual(await firstDestination.evaluate(element => ({
+    color: getComputedStyle(element).color,
+    border: getComputedStyle(element).borderColor,
+  })), {
+    color: "rgb(0, 232, 90)",
+    border: "rgb(111, 191, 131)",
+  });
+
+  await page.keyboard.press("Tab");
+  assert.match(await page.locator(":focus").innerText(), /Open Orrery in 3D/);
+  await page.keyboard.press("Tab");
+  assert.match(await page.locator(":focus").innerText(), /Open Orrery in 2D/);
+
+  await close.click();
+  assert(await dialog.isHidden());
+  await page.waitForFunction(() => document.querySelector('[aria-label="Playback speed"]').value === "1.5");
+  await page.waitForFunction(previous => document.querySelector("#orrery-date").textContent !== previous, date);
+  assert(await page.evaluate(() => document.activeElement === document.body), "Closing clears focus from the modal without focusing Options");
+  assert.equal(await speed.inputValue(), "1.5", "Closing resumes the configured/default playback speed");
+  assert(await page.locator("canvas").isVisible());
+  await page.screenshot({ path: path.join(report, screenshot.replace("dialog", "dismissed")), fullPage: true });
+
+  const trigger = page.locator(".orrery-options-trigger");
+  assert.equal(await trigger.evaluate(element => getComputedStyle(element).color), "rgb(136, 136, 136)");
+  assert.equal(await page.locator("#orrery-date").evaluate(element => getComputedStyle(element).color), "rgb(136, 136, 136)");
+  await trigger.hover();
+  assert.equal(await trigger.evaluate(element => getComputedStyle(element).color), "rgb(0, 232, 90)");
+  await trigger.click();
+  const panel = page.locator(".orrery-options-panel");
+  assert(await panel.isVisible());
+  const panelTheme = await panel.evaluate(element => ({
+    border: getComputedStyle(element).borderColor,
+    label: getComputedStyle(element.querySelector(".property-name")).color,
+    slider: getComputedStyle(element.querySelector(".slider-fg")).backgroundColor,
+  }));
+  assert.deepEqual(panelTheme, {
+    border: "rgb(54, 92, 65)",
+    label: "rgb(181, 232, 193)",
+    slider: "rgb(71, 123, 84)",
+  });
+  await speed.fill("2.5");
+  await speed.press("Enter");
+  await speed.blur();
+  assert.equal(await speed.inputValue(), "2.5", "Fractional speed remains truthful after resume and blur");
+  const panelLayout = await panel.evaluate(element => {
+    const rect = element.getBoundingClientRect();
+    return { left: rect.left, right: rect.right, viewportWidth: innerWidth, overflow: document.documentElement.scrollWidth - innerWidth };
+  });
+  assert.ok(panelLayout.left >= 0 && panelLayout.right <= panelLayout.viewportWidth);
+  assert.ok(panelLayout.overflow <= 0, `Options horizontal overflow is ${panelLayout.overflow}px`);
+  if (viewport.width >= 1000) {
+    await page.screenshot({ path: path.join(report, "options-1280x800.png"), fullPage: true });
+  }
+  assert.deepEqual(errors, []);
+  await context.close();
+}
+
+async function inspectFallback(browser, viewport, screenshot) {
+  const context = await browser.newContext({ javaScriptEnabled: false, viewport });
+  const page = await context.newPage();
+  await page.goto(`${pathToFileURL(path.join(output, "404.html")).href}?from=bookmark#missing`);
+  assert.equal(await page.getByRole("heading").innerText(), "Orrery3D has moved");
+  assert.deepEqual(await page.getByRole("link").evaluateAll(links => links.map(link => link.href)), destinations);
+  assert.equal(await page.locator(".mode").count(), 0);
+  const theme = await page.locator("main").evaluate(element => ({
+    accent: getComputedStyle(document.documentElement).getPropertyValue("--color-accent").trim(),
+    border: getComputedStyle(element).borderColor,
+    linkBorder: getComputedStyle(element.querySelector("a")).borderColor,
+    linkBackgrounds: [...element.querySelectorAll("a")].map(link => getComputedStyle(link).backgroundColor),
+  }));
+  assert.deepEqual(theme, {
+    accent: "#00e85a",
+    border: "rgb(54, 92, 65)",
+    linkBorder: "rgb(71, 123, 84)",
+    linkBackgrounds: ["rgb(17, 17, 17)", "rgb(17, 17, 17)"],
+  });
+  assert.equal(await page.evaluate(() => document.documentElement.scrollWidth), viewport.width);
+  if (screenshot) await page.screenshot({ path: path.join(report, screenshot), fullPage: true });
+  const firstDestination = page.getByRole("link").first();
+  await firstDestination.hover();
+  assert.deepEqual(await firstDestination.evaluate(element => ({
+    color: getComputedStyle(element).color,
+    border: getComputedStyle(element).borderColor,
+  })), {
+    color: "rgb(0, 232, 90)",
+    border: "rgb(111, 191, 131)",
+  });
+  await context.close();
+}
+
+async function inspectEarlyDismiss(browser) {
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  let releaseLatest;
+  const latestGate = new Promise(resolve => { releaseLatest = resolve; });
+  await context.route("https://sn3p.github.io/orrery-data/**", async route => {
+    if (new URL(route.request().url()).pathname.endsWith("/latest.json")) {
+      await latestGate;
+    }
+    await routeCatalog(route);
+  });
+  const page = await context.newPage();
+  const errors = [];
+  page.on("console", message => { if (message.type() === "error") errors.push(`console: ${message.text()}`); });
+  page.on("pageerror", error => errors.push(`page: ${error.message}`));
+  page.on("requestfailed", request => errors.push(`request: ${request.url()}`));
+
+  await page.goto(pathToFileURL(path.join(output, "index.html")).href);
+  const dialog = page.getByRole("dialog", { name: "Orrery3D has moved" });
+  await dialog.waitFor({ state: "visible" });
+  const date = await page.locator("#orrery-date").innerText();
+  assert(await page.locator("#orrery-status").isVisible(), "Catalogue remains pending before early dismissal");
+  assert.equal(await page.locator('[aria-label="Playback speed"]').inputValue(), "0");
+  await page.keyboard.press("Escape");
+  assert(await dialog.isHidden());
+  await page.waitForFunction(() => document.querySelector('[aria-label="Playback speed"]').value === "1.5");
+  releaseLatest();
+  await page.waitForFunction(() => document.querySelector("#orrery-status").hidden);
+  await page.waitForFunction(previous => document.querySelector("#orrery-date").textContent !== previous, date);
+  assert(await page.evaluate(() => document.activeElement === document.body), "Escape clears focus from the modal without focusing Options");
+  assert.deepEqual(errors, []);
+  await context.close();
+}
+
+(async () => {
+  await fs.rm(report, { recursive: true, force: true });
+  await fs.mkdir(report, { recursive: true });
+  const browser = await chromium.launch({ channel: "chrome", headless: true });
+  try {
+    await inspectApplication(browser, { width: 1280, height: 800 }, "dialog-1280x800.png");
+    await inspectApplication(browser, { width: 320, height: 720 }, "dialog-320x720.png");
+    await inspectApplication(browser, { width: 160, height: 720 }, "dialog-160x720.png");
+    await inspectEarlyDismiss(browser);
+    await inspectFallback(browser, { width: 320, height: 720 }, "fallback-320x720.png");
+    await inspectFallback(browser, { width: 160, height: 720 });
+  } finally {
+    await browser.close();
+  }
+  process.stdout.write(`Rendered move-notice checks passed; screenshots: ${path.relative(root, report)}\n`);
+})().catch(error => {
+  console.error(error);
+  process.exitCode = 1;
+});

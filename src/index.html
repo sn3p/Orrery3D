@@ -3,8 +3,9 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Orrery3D</title>
-    <meta name="description" content="3D minor planet orbits and discovery visualization">
+    <title>Orrery3D has moved</title>
+    <meta name="description" content="Orrery3D has moved into Orrery, alongside the original 2D view.">
+    <link rel="canonical" href="https://sn3p.github.io/Orrery/?renderer=three">
     <link rel="stylesheet" href="<%= htmlWebpackPlugin.files.css[0] %>">
   </head>
   <body>
@@ -13,6 +14,33 @@
     <div class="orrery-date" id="orrery-date"></div>
     <div class="orrery-count" id="orrery-count"></div>
     <div class="orrery-status" id="orrery-status" role="status">Loading asteroids…</div>
+
+    <dialog class="orrery-move" id="orrery-move" aria-labelledby="orrery-move-title" aria-describedby="orrery-move-summary">
+      <form method="dialog">
+        <button class="orrery-move-close" type="submit" aria-label="Close move notice" autofocus>
+          <span aria-hidden="true">×</span>
+        </button>
+      </form>
+
+      <div class="orrery-move-content">
+        <h1 id="orrery-move-title">Orrery3D has moved</h1>
+        <p id="orrery-move-summary">
+          The 3D view now lives in Orrery, alongside the original 2D view.
+          Choose a view, or close this dialog to explore the original Orrery3D.
+        </p>
+
+        <nav class="orrery-move-destinations" aria-label="Open Orrery">
+          <a class="orrery-move-destination" href="https://sn3p.github.io/Orrery/?renderer=three">
+            <strong>Open Orrery in 3D</strong>
+            <span class="orrery-move-renderer">Three.js renderer <span aria-hidden="true">↗</span></span>
+          </a>
+          <a class="orrery-move-destination" href="https://sn3p.github.io/Orrery/">
+            <strong>Open Orrery in 2D</strong>
+            <span class="orrery-move-renderer">Pixi.js renderer <span aria-hidden="true">↗</span></span>
+          </a>
+        </nav>
+      </div>
+    </dialog>
 
     <script src="<%= htmlWebpackPlugin.files.js[0] %>"></script>
   </body>

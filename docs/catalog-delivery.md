@@ -1,5 +1,11 @@
 # Catalogue delivery
 
+> **Historical documentation.** This records the final standalone Orrery3D
+> catalogue implementation. The current production entry retains this app
+> paused behind a [move dialog](../README.md#orrery3d-has-moved); ongoing
+> application and catalogue maintenance now live in
+> [Orrery](https://github.com/sn3p/Orrery).
+
 The ordinary application selects the **895,910-object indexed catalogue** in
 `catalog.config.json`. There is no 100,000-object cap; the displayed count is the
 population discovered by the current simulation date.

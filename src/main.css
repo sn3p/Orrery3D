@@ -9,6 +9,17 @@
 :root {
   --font-ui: "JetBrains Mono Variable", "Lucida Console", Courier, monospace;
   --font-ui-size: 14px;
+  --color-hud: #888;
+  --color-options-label: #b5e8c1;
+  --color-options-value: #aaa;
+  --color-options-help: #808080;
+  --color-accent: #00e85a;
+  --color-accent-muted: #6fbf83;
+  --color-link: #ddd;
+  --color-panel: #111;
+  --color-panel-raised: #1a1a1a;
+  --color-panel-border: #365c41;
+  --color-control-border: #477b54;
 }
 
 body {
@@ -26,9 +37,10 @@ body {
 .orrery-date,
 .orrery-fps,
 .orrery-count {
-  color: #666;
+  color: var(--color-hud);
   padding: 5px;
   position: fixed;
+  font-variant-numeric: tabular-nums;
 }
 
 .orrery-fps {
@@ -54,9 +66,145 @@ body {
   max-width: calc(100vw - 48px);
   width: max-content;
   padding: 12px;
-  color: #ccc;
-  background: #151515ee;
+  color: var(--color-hud);
+  background: rgb(17 17 17 / 94%);
+  border: 1px solid var(--color-panel-border);
   text-align: center;
+}
+
+/*
+Move notice
+*/
+
+.orrery-move {
+  box-sizing: border-box;
+  width: min(620px, calc(100vw - 32px));
+  max-height: calc(100dvh - 32px);
+  margin: auto;
+  padding: 0;
+  overflow: auto;
+  border: 1px solid var(--color-panel-border);
+  border-radius: 0;
+  color: #ccc;
+  background: rgb(17 17 17 / 96%);
+  box-shadow: 0 24px 80px rgb(0 0 0 / 80%);
+}
+
+.orrery-move::backdrop {
+  background: rgb(0 0 0 / 58%);
+}
+
+.orrery-move-content {
+  padding: 34px;
+}
+
+.orrery-move h1 {
+  margin: 0;
+  padding-right: 34px;
+  color: #eee;
+  font-size: clamp(22px, 4vw, 28px);
+  font-weight: 500;
+  letter-spacing: -0.04em;
+  line-height: 1.15;
+  overflow-wrap: anywhere;
+}
+
+.orrery-move p {
+  max-width: 54ch;
+  margin: 14px 0 0;
+  color: #ccc;
+  font-size: 14px;
+  line-height: 1.65;
+}
+
+.orrery-move-close {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: 1px solid var(--color-control-border);
+  color: var(--color-options-label);
+  background: var(--color-panel-raised);
+  font: inherit;
+  font-size: 24px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.orrery-move-close:hover {
+  border-color: var(--color-accent-muted);
+  color: #fff;
+  background: var(--color-panel-raised);
+}
+
+.orrery-move-close:focus-visible,
+.orrery-move-destination:focus-visible {
+  outline: 1px solid var(--color-accent);
+  outline-offset: 3px;
+}
+
+.orrery-move-destinations {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 28px;
+}
+
+.orrery-move-destination {
+  min-width: 0;
+  padding: 18px;
+  border: 1px solid var(--color-control-border);
+  color: var(--color-link);
+  background: var(--color-panel);
+  text-decoration: none;
+  overflow-wrap: anywhere;
+}
+
+.orrery-move-destination:hover {
+  border-color: var(--color-accent-muted);
+  color: var(--color-accent);
+  background: var(--color-panel-raised);
+}
+
+.orrery-move-renderer,
+.orrery-move-destination strong {
+  display: block;
+}
+
+.orrery-move-destination strong {
+  color: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1.35;
+}
+
+.orrery-move-renderer {
+  margin-top: 10px;
+  color: var(--color-hud);
+  font-size: 11px;
+}
+
+@media (max-width: 480px) {
+  .orrery-move {
+    width: calc(100vw - 24px);
+    max-height: calc(100dvh - 24px);
+  }
+
+  .orrery-move-content {
+    padding: 28px 20px 20px;
+  }
+
+  .orrery-move-destinations {
+    grid-template-columns: 1fr;
+    margin-top: 22px;
+  }
+
+  .orrery-move-destination {
+    padding: 14px 16px;
+  }
+
 }
 
 /*
@@ -75,7 +223,7 @@ dat.GUI overrides
   padding: 0 3px 4px;
   border: 0;
   background: black;
-  color: #999;
+  color: var(--color-hud);
   font: inherit;
   line-height: 18px;
   word-spacing: -0.3em;
@@ -89,11 +237,12 @@ dat.GUI overrides
 }
 
 .orrery-options-trigger:hover {
-  color: #ccc;
+  color: var(--color-accent);
 }
 
 .orrery-options-trigger:focus-visible {
-  outline: 1px solid #999;
+  outline: 1px solid var(--color-accent);
+  outline-offset: 2px;
 }
 
 .orrery-options-panel {
@@ -104,8 +253,8 @@ dat.GUI overrides
   box-sizing: border-box;
   margin-top: 4px;
   padding: 8px;
-  border: 1px solid #333;
-  background: #111;
+  border: 1px solid var(--color-panel-border);
+  background: var(--color-panel);
 }
 
 .orrery-options-panel .dg.main {
@@ -119,7 +268,7 @@ dat.GUI overrides
 .orrery-options-hint {
   clear: both;
   margin: 0 0 8px;
-  color: #888;
+  color: var(--color-options-help);
   font-size: 11px;
   line-height: 16px;
 }
@@ -146,7 +295,7 @@ dat.GUI overrides
 }
 
 .dg .property-name {
-  color: #bbb !important;
+  color: var(--color-options-label) !important;
   width: 20% !important;
 }
 
@@ -160,15 +309,15 @@ dat.GUI overrides
 }
 
 .dg .slider-fg {
-  background-color: #555 !important;
+  background-color: var(--color-control-border) !important;
 }
 
 .dg .slider:hover .slider-fg {
-  background-color: #777 !important;
+  background-color: var(--color-accent-muted) !important;
 }
 
 .dg .c input {
-  color: #777 !important;
+  color: var(--color-options-value) !important;
   font-size: 12px !important;
   height: 19px !important;
   line-height: 19px !important;
@@ -177,16 +326,16 @@ dat.GUI overrides
 }
 
 .dg .c:hover input {
-  color: #999 !important;
+  color: var(--color-options-value) !important;
 }
 
 .dg .c select {
   font-family: var(--font-ui);
   font-size: 12px;
-  color: #999;
-  background: #151515;
+  color: var(--color-options-value);
+  background: var(--color-panel-raised);
   color-scheme: dark;
-  border: 1px solid #666;
+  border: 1px solid var(--color-control-border);
   border-radius: 0;
   height: 19px;
   margin: 4px 0;
@@ -194,6 +343,11 @@ dat.GUI overrides
 }
 
 .dg .c select:focus-visible {
-  outline: 1px solid #999;
+  outline: 1px solid var(--color-accent);
+  outline-offset: 1px;
+}
+
+.dg .c input:focus {
+  outline: 1px solid var(--color-accent) !important;
   outline-offset: 1px;
 }

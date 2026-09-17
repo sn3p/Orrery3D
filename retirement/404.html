@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Orrery3D has moved</title>
+    <meta name="description" content="Orrery3D has moved into Orrery, alongside the original 2D view.">
+    <link rel="canonical" href="https://sn3p.github.io/Orrery/?renderer=three">
+    <style>
+      :root {
+        color-scheme: dark;
+        font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+        --color-hud: #888;
+        --color-accent: #00e85a;
+        --color-accent-muted: #6fbf83;
+        --color-link: #ddd;
+        --color-panel: #111;
+        --color-panel-raised: #1a1a1a;
+        --color-panel-border: #365c41;
+        --color-control-border: #477b54;
+        color: #ccc;
+        background: #000;
+      }
+
+      * { box-sizing: border-box; }
+
+      body {
+        min-width: 0;
+        min-height: 100vh;
+        margin: 0;
+        padding: 16px;
+        display: grid;
+        place-items: center;
+      }
+
+      main {
+        width: min(100%, 620px);
+        padding: 34px;
+        border: 1px solid var(--color-panel-border);
+        background: var(--color-panel);
+      }
+
+      h1 {
+        margin: 0;
+        color: #eee;
+        font-size: clamp(22px, 4vw, 28px);
+        font-weight: 500;
+        letter-spacing: -0.04em;
+        line-height: 1.15;
+        overflow-wrap: anywhere;
+      }
+
+      p {
+        margin: 14px 0 0;
+        color: #ccc;
+        font-size: 14px;
+        line-height: 1.65;
+      }
+
+      nav {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 12px;
+        margin-top: 28px;
+      }
+
+      a {
+        min-width: 0;
+        padding: 18px;
+        border: 1px solid var(--color-control-border);
+        color: var(--color-link);
+        background: var(--color-panel);
+        text-decoration: none;
+        overflow-wrap: anywhere;
+      }
+
+      a:hover {
+        border-color: var(--color-accent-muted);
+        color: var(--color-accent);
+        background: var(--color-panel-raised);
+      }
+
+      a:focus-visible {
+        outline: 1px solid var(--color-accent);
+        outline-offset: 3px;
+      }
+
+      a > span, strong { display: block; }
+
+      strong {
+        color: inherit;
+        font-size: 14px;
+        font-weight: 500;
+        line-height: 1.35;
+      }
+
+      .renderer {
+        margin-top: 10px;
+        color: var(--color-hud);
+        font-size: 11px;
+      }
+
+      @media (max-width: 480px) {
+        body { padding: 12px; }
+        main { padding: 28px 20px 20px; }
+        nav { grid-template-columns: 1fr; margin-top: 22px; }
+        a { padding: 14px 16px; }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Orrery3D has moved</h1>
+      <p>This page is no longer available. Choose a view in Orrery instead.</p>
+      <nav aria-label="Open Orrery">
+        <a href="https://sn3p.github.io/Orrery/?renderer=three">
+          <strong>Open Orrery in 3D</strong>
+          <span class="renderer">Three.js renderer <span aria-hidden="true">↗</span></span>
+        </a>
+        <a href="https://sn3p.github.io/Orrery/">
+          <strong>Open Orrery in 2D</strong>
+          <span class="renderer">Pixi.js renderer <span aria-hidden="true">↗</span></span>
+        </a>
+      </nav>
+    </main>
+  </body>
+</html>

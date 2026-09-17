@@ -162,7 +162,7 @@ async function checkOutput(configPath, output) {
 }
 
 async function buildTrial(configPath, output = path.join(root, ".context/catalog-site"),
-  { entry = "./src/index.js", publicDefaults = false } = {}) {
+  { entry = "./src/index.js", publicDefaults = false, stageOutput } = {}) {
   output = path.resolve(output);
   await checkOutput(configPath, output);
   await fs.mkdir(path.dirname(output), { recursive: true });
@@ -185,6 +185,7 @@ async function buildTrial(configPath, output = path.join(root, ".context/catalog
       }));
     });
     await stageCatalog(prepared, temporary);
+    if (stageOutput) await stageOutput(temporary);
     let siteBytes = 0;
     for (const name of await fs.readdir(temporary, { recursive: true, withFileTypes: true })) {
       if (name.isFile()) siteBytes += (await fs.stat(path.join(name.parentPath, name.name))).size;

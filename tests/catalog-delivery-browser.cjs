@@ -4,6 +4,7 @@ const assert = require("node:assert/strict");
 const { spawnSync } = require("node:child_process");
 const { createHash } = require("node:crypto");
 const cases = require("./fixtures/consumer-v1/cases.json");
+const { dismissMoveNotice } = require("./move-notice-helpers.cjs");
 const root = path.resolve(__dirname, "..");
 
 exports.build = output => {
@@ -23,6 +24,7 @@ exports.run = async (browser, base, output, name) => {
   missing.on("request", request => missingRequests.push(request.url()));
   try {
     await missing.goto(base + "/unconfigured/");
+    await dismissMoveNotice(missing);
     await missing.getByRole("alert").waitFor();
     assert.match(await missing.getByRole("alert").textContent(), /Could not load the asteroid catalogue/);
     assert(!missingRequests.some(url => /\.json(?:\?|$)/.test(url)), "An unconfigured app cannot fetch a fallback dataset");
@@ -33,6 +35,7 @@ exports.run = async (browser, base, output, name) => {
       };
     });
     await missing.goto(base + "/delivery/Orrery3D/");
+    await dismissMoveNotice(missing);
     await missing.getByRole("alert").waitFor();
     assert.match(await missing.getByRole("alert").textContent(), /WebGL 2 is required/);
     assert.equal(await missing.locator(".dg.main, .orrery-options").count(), 0);
@@ -59,6 +62,7 @@ exports.run = async (browser, base, output, name) => {
       await page.setViewportSize({ width, height: 800 });
       await page.goto(base + "/delivery/Orrery3D/");
       await page.waitForFunction(() => document.querySelector("#orrery-count").textContent.replace(/\D/g, "") === "4");
+      await dismissMoveNotice(page);
       await require("./options.cjs").openOptions(page);
       const speed = page.getByRole("textbox", { name: "Playback speed" });
       await speed.focus();
