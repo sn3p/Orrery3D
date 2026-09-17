@@ -5,9 +5,23 @@ const path = require("node:path");
 const root = path.resolve(__dirname, "..");
 const output = path.join(root, "dist");
 
-function option(name, fallback) {
-  const index = process.argv.indexOf(name);
-  return index === -1 ? fallback : process.argv[index + 1];
+function option(args, name, fallback) {
+  const index = args.indexOf(name);
+  if (index === -1) return fallback;
+  const value = args[index + 1];
+  if (!value || value.startsWith("--")) {
+    throw new Error(`The retirement server requires a value for ${name}.`);
+  }
+  return value;
+}
+
+function parseOptions(args = process.argv.slice(2)) {
+  const host = option(args, "--host", "127.0.0.1");
+  const port = Number(option(args, "--port", "3000"));
+  if (!Number.isInteger(port) || port < 1 || port > 65535) {
+    throw new Error("The retirement server requires a valid --port.");
+  }
+  return { host, port };
 }
 
 async function handleRequest(request, response) {
@@ -34,11 +48,7 @@ async function handleRequest(request, response) {
 }
 
 function start() {
-  const host = option("--host", "127.0.0.1");
-  const port = Number(option("--port", "3000"));
-  if (!Number.isInteger(port) || port < 1 || port > 65535) {
-    throw new Error("The retirement server requires a valid --port.");
-  }
+  const { host, port } = parseOptions();
 
   const server = http.createServer((request, response) => {
     handleRequest(request, response).catch(error => {
@@ -59,4 +69,4 @@ function start() {
 
 if (require.main === module) start();
 
-module.exports = { handleRequest };
+module.exports = { handleRequest, parseOptions };
