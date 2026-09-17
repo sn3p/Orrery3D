@@ -14,9 +14,11 @@
     "catalog:benchmark": "node benchmarks/catalog-loading.cjs",
     "build": "node scripts/build.cjs",
     "deploy": "gh workflow run pages.yml --ref master",
-    "watch": "webpack --config webpack.app.config.cjs --mode development --watch",
-    "serve": "webpack serve --config webpack.app.config.cjs --mode development --open",
-    "test": "node --test tests/retirement.cjs && node tests/retirement-browser.cjs"
+    "watch": "node --watch-path=retirement/index.html scripts/build.cjs --output-clean",
+    "serve": "npm run build -- --output-clean && node scripts/serve.cjs",
+    "historical:watch": "webpack --config webpack.app.config.cjs --mode development --watch",
+    "historical:serve": "webpack serve --config webpack.app.config.cjs --mode development --open",
+    "test": "node --test tests/retirement.cjs tests/retirement-server.cjs && node tests/retirement-browser.cjs"
   },
   "dependencies": {
     "dat.gui": "^0.7.9",

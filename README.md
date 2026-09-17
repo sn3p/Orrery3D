@@ -33,6 +33,17 @@ The browser check renders the page with JavaScript disabled at narrow and
 desktop sizes and verifies content, destinations, overflow, focus visibility,
 and console/network failures.
 
+For local inspection, including Conductor's **Run App** action:
+
+```bash
+npm run serve -- --host 127.0.0.1 --port 3000 --no-open
+```
+
+The local server builds and serves the same retirement notice. Unknown paths
+return the matching notice with a real `404` response. The former application
+development server remains available only as `npm run historical:serve` for
+source archaeology; it is not part of the maintained site.
+
 ## Deployment
 
 [GitHub Pages](https://sn3p.github.io/Orrery3D/) updates automatically after a
