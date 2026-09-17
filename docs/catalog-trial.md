@@ -1,5 +1,10 @@
 # Local catalog adapter trial
 
+> **Historical documentation.** This runbook applies to the retained standalone
+> application source, not the current retirement-page production build. The
+> maintained catalogue consumer now lives in
+> [Orrery](https://github.com/sn3p/Orrery).
+
 Normal build/serve/watch commands now select the larger indexed catalogue through
 [catalogue delivery](catalog-delivery.md). That document covers the current source,
 mode options and the published shared data source. This separate trial supports explicit
