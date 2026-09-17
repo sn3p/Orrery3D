@@ -147,10 +147,9 @@ async function inspectApplication(browser, viewport, screenshot) {
 
   await close.click();
   assert(await dialog.isHidden());
-  await page.waitForFunction(() => document.activeElement?.classList.contains("orrery-options-trigger"));
   await page.waitForFunction(() => document.querySelector('[aria-label="Playback speed"]').value === "1.5");
   await page.waitForFunction(previous => document.querySelector("#orrery-date").textContent !== previous, date);
-  assert(await page.locator(".orrery-options-trigger").evaluate(element => element === document.activeElement));
+  assert(await page.evaluate(() => document.activeElement === document.body), "Closing clears focus from the modal without focusing Options");
   assert.equal(await speed.inputValue(), "1.5", "Closing resumes the configured/default playback speed");
   assert(await page.locator("canvas").isVisible());
   await page.screenshot({ path: path.join(report, screenshot.replace("dialog", "dismissed")), fullPage: true });
@@ -251,7 +250,7 @@ async function inspectEarlyDismiss(browser) {
   releaseLatest();
   await page.waitForFunction(() => document.querySelector("#orrery-status").hidden);
   await page.waitForFunction(previous => document.querySelector("#orrery-date").textContent !== previous, date);
-  assert(await page.locator(".orrery-options-trigger").evaluate(element => element === document.activeElement));
+  assert(await page.evaluate(() => document.activeElement === document.body), "Escape clears focus from the modal without focusing Options");
   assert.deepEqual(errors, []);
   await context.close();
 }

@@ -17,6 +17,6 @@ export const { orrery, ready } = startApp(async app => {
 if (moveNotice) {
   moveNotice.addEventListener("close", () => {
     orrery?.gui.setPlaybackSpeed(resumeSpeed);
-    requestAnimationFrame(() => document.querySelector(".orrery-options-trigger")?.focus());
+    if (moveNotice.contains(document.activeElement)) document.activeElement.blur();
   }, { once: true });
 }
